@@ -6,4 +6,5 @@ set(sources ${sources}
 	src/Manager.cpp
 	src/Hooks.cpp
 	src/MCP.cpp
+ 	src/Serialization.cpp
 )
