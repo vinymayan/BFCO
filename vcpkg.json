@@ -3,7 +3,6 @@
   "name": "modname",
   "version-string": "0.1.0.0",
   "dependencies": [
-    "rapidjson",
     "fast-cpp-csv-parser",
     "rsm-binary-io",
     "spdlog",
