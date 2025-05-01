@@ -1,3 +1,5 @@
+#### YOU NEED CMAKE < 3.5 !
+
 #### WINDOWS ENVIRONMENT VARIABLES TO SET
 
 1. **`COMMONLIB_SSE_FOLDER`**: The path to your clone of Commonlib.
