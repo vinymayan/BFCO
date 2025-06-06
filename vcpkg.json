@@ -9,6 +9,7 @@
     "xbyak",
     "rapidcsv",
     "clib-util",
+    "directxtk",
     "skse-mcp"
   ],
   "overrides": [
