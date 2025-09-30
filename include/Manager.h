@@ -10,6 +10,13 @@
 extern const std::map<ImGuiKey, int> g_imgui_to_dx_map;
 extern const std::map<int, const char*> g_dx_to_name_map;
 extern const std::map<int, const char*> g_gamepad_dx_to_name_map;
+
+inline RE::TESGlobal* DirPowerAttack = nullptr;
+inline RE::TESGlobal* Global_LmbPowerAttack = nullptr;
+inline RE::TESGlobal* Global_RmbPowerAttack = nullptr;
+inline RE::TESGlobal* Global_KeyAttackComb = nullptr;
+inline RE::TESGlobal* Global_DisJumpAttack = nullptr;
+
 namespace SettingsMenu {
     // Função para salvar as configurações atuais no arquivo JSON.
     void Save();
@@ -18,6 +25,7 @@ namespace SettingsMenu {
     // Função para registrar o menu no SKSE Menu Framework.
     void Register();
     void __stdcall Render();
+    void SyncGlobals();
     // --- Funções de Keybinding ---
     void Keybind(const char* label, int* dx_key_ptr);
     void GamepadKeybind(const char* label, int* dx_key_ptr);

@@ -176,101 +176,124 @@ const std::map<int, const char*> g_gamepad_dx_to_name_map = {
 
 constexpr const char* settings_path = "Data/SKSE/Plugins/BFCO_Settings.json";
 
+void SettingsMenu::SyncGlobals() {
+    logger::info("Sincronizando configurações com as Globals do jogo...");
+
+    if (Global_LmbPowerAttack) Global_LmbPowerAttack->value = g_settings.lightAttackToPowerAttack ? 1.0f : 0.0f;
+    if (Global_RmbPowerAttack) Global_RmbPowerAttack->value = g_settings.blockToPowerAttack ? 1.0f : 0.0f;
+    if (Global_KeyAttackComb) Global_KeyAttackComb->value = g_settings.enableComboKey ? 1.0f : 0.0f;
+    if (Global_DisJumpAttack) Global_DisJumpAttack->value = g_settings.disableJumpingAttack ? 1.0f : 0.0f;
+    if (DirPowerAttack)     DirPowerAttack->value = g_settings.enableDirectionalPowerAttack ? 1.0f : 0.0f;
+
+    logger::info("Sincronização concluída.");
+}
     
 void SettingsMenu::Save() {
-        logger::info("Salvando configurações em {}", settings_path);
+    logger::info("Salvando configurações em {}", settings_path);
 
-        rapidjson::Document doc;
-        doc.SetObject();
-        rapidjson::Document::AllocatorType& allocator = doc.GetAllocator();
+    rapidjson::Document doc;
+    doc.SetObject();
+    rapidjson::Document::AllocatorType& allocator = doc.GetAllocator();
 
-        // Adiciona cada configuração da struct g_settings ao documento JSON
-        doc.AddMember("allowZeroStamina", g_settings.allowZeroStamina, allocator);
-        doc.AddMember("onlyDuringAttack", g_settings.onlyDuringAttack, allocator);
-        doc.AddMember("disableBlockDuringAttack", g_settings.disableBlockDuringAttack, allocator);
-        doc.AddMember("queuePA", g_settings.queuePA, allocator);
-        doc.AddMember("notifyWindow", g_settings.notifyWindow, allocator);
-        doc.AddMember("notifyDuration", g_settings.notifyDuration, allocator);
-        doc.AddMember("queuePAExpire", g_settings.queuePAExpire, allocator);
-        doc.AddMember("enableComboKey", g_settings.enableComboKey, allocator);
-        doc.AddMember("lightAttackToPowerAttack", g_settings.lightAttackToPowerAttack, allocator);
-        doc.AddMember("blockToPowerAttack", g_settings.blockToPowerAttack, allocator);
-        doc.AddMember("disableJumpingAttack", g_settings.disableJumpingAttack, allocator);
-        doc.AddMember("debugPAPress", g_settings.debugPAPress, allocator);
-        doc.AddMember("debugPAActivate", g_settings.debugPAActivate, allocator);
+    doc.AddMember("allowZeroStamina", g_settings.allowZeroStamina, allocator);
+    doc.AddMember("onlyDuringAttack", g_settings.onlyDuringAttack, allocator);
+    doc.AddMember("disableBlockDuringAttack", g_settings.disableBlockDuringAttack, allocator);
+    doc.AddMember("queuePA", g_settings.queuePA, allocator);
+    doc.AddMember("notifyWindow", g_settings.notifyWindow, allocator);
+    doc.AddMember("notifyDuration", g_settings.notifyDuration, allocator);
+    doc.AddMember("queuePAExpire", g_settings.queuePAExpire, allocator);
+    doc.AddMember("enableComboKey", g_settings.enableComboKey, allocator);
+    doc.AddMember("holdToPowerAttackMode", g_settings.holdToPowerAttackMode, allocator);
+    doc.AddMember("lightAttackToPowerAttack", g_settings.lightAttackToPowerAttack, allocator);
+    doc.AddMember("blockToPowerAttack", g_settings.blockToPowerAttack, allocator);
+    doc.AddMember("disableJumpingAttack", g_settings.disableJumpingAttack, allocator);
+    doc.AddMember("enableDirectionalPowerAttack", g_settings.enableDirectionalPowerAttack, allocator);
+    // Salva as novas configurações de teclas
+    doc.AddMember("powerAttackKey_k", g_settings.powerAttackKey_k, allocator);
+    doc.AddMember("powerAttackKey_g", g_settings.powerAttackKey_g, allocator);
+    doc.AddMember("comboKey_k", g_settings.comboKey_k, allocator);
+    doc.AddMember("comboKey_g", g_settings.comboKey_g, allocator);
 
-        // Garante que o diretório de plugins exista
-        std::filesystem::path config_path(settings_path);
-        std::filesystem::create_directories(config_path.parent_path());
+    doc.AddMember("debugPAPress", g_settings.debugPAPress, allocator);
+    doc.AddMember("debugPAActivate", g_settings.debugPAActivate, allocator);
 
-        // Escreve o JSON no arquivo
-        std::ofstream ofs(settings_path);
-        if (ofs.is_open()) {
-            rapidjson::OStreamWrapper osw(ofs);
-            rapidjson::PrettyWriter<rapidjson::OStreamWrapper> writer(osw);
-            doc.Accept(writer);
-            ofs.close();
-            logger::info("Configurações salvas com sucesso.");
-        } else {
-            logger::error("Falha ao abrir o arquivo para salvar as configurações: {}", settings_path);
-        }
+    std::filesystem::path config_path(settings_path);
+    std::filesystem::create_directories(config_path.parent_path());
+
+    std::ofstream ofs(settings_path);
+    if (ofs.is_open()) {
+        rapidjson::OStreamWrapper osw(ofs);
+        rapidjson::PrettyWriter<rapidjson::OStreamWrapper> writer(osw);
+        doc.Accept(writer);
+        ofs.close();
+        logger::info("Configurações salvas com sucesso.");
+    } else {
+        logger::error("Falha ao abrir o arquivo para salvar as configurações: {}", settings_path);
+    }
+}
+
+void SettingsMenu::Load() {
+    logger::info("Carregando configurações de {}", settings_path);
+
+    std::ifstream ifs(settings_path);
+    if (!ifs.is_open()) {
+        logger::warn("Arquivo de configurações não encontrado. Criando um novo com valores padrão.");
+        Save();
+        return;
     }
 
-    // Função para carregar as configurações do arquivo JSON
-    void SettingsMenu::Load() {
-        logger::info("Carregando configurações de {}", settings_path);
+    rapidjson::IStreamWrapper isw(ifs);
+    rapidjson::Document doc;
+    doc.ParseStream(isw);
+    ifs.close();
 
-        std::ifstream ifs(settings_path);
-        if (!ifs.is_open()) {
-            logger::warn("Arquivo de configurações não encontrado. Criando um novo com valores padrão.");
-            Save();  // Se o arquivo não existe, cria um com os valores padrão
-            return;
-        }
-
-        rapidjson::IStreamWrapper isw(ifs);
-        rapidjson::Document doc;
-        doc.ParseStream(isw);
-        ifs.close();
-
-        if (doc.HasParseError() || !doc.IsObject()) {
-            logger::error("Falha ao analisar o arquivo de configurações. Usando valores padrão.");
-            return;
-        }
-
-        // Carrega cada valor do JSON para a struct g_settings, verificando o tipo
-        if (doc.HasMember("allowZeroStamina") && doc["allowZeroStamina"].IsBool())
-            g_settings.allowZeroStamina = doc["allowZeroStamina"].GetBool();
-        if (doc.HasMember("onlyDuringAttack") && doc["onlyDuringAttack"].IsBool())
-            g_settings.onlyDuringAttack = doc["onlyDuringAttack"].GetBool();
-        if (doc.HasMember("disableBlockDuringAttack") && doc["disableBlockDuringAttack"].IsBool())
-            g_settings.disableBlockDuringAttack = doc["disableBlockDuringAttack"].GetBool();
-        if (doc.HasMember("queuePA") && doc["queuePA"].IsBool()) g_settings.queuePA = doc["queuePA"].GetBool();
-        if (doc.HasMember("notifyWindow") && doc["notifyWindow"].IsBool())
-            g_settings.notifyWindow = doc["notifyWindow"].GetBool();
-        if (doc.HasMember("notifyDuration") && doc["notifyDuration"].IsFloat())
-            g_settings.notifyDuration = doc["notifyDuration"].GetFloat();
-        if (doc.HasMember("queuePAExpire") && doc["queuePAExpire"].IsFloat())
-            g_settings.queuePAExpire = doc["queuePAExpire"].GetFloat();
-        if (doc.HasMember("enableComboKey") && doc["enableComboKey"].IsBool())
-            g_settings.enableComboKey = doc["enableComboKey"].GetBool();
-        if (doc.HasMember("lightAttackToPowerAttack") && doc["lightAttackToPowerAttack"].IsBool())
-            g_settings.lightAttackToPowerAttack = doc["lightAttackToPowerAttack"].GetBool();
-        if (doc.HasMember("blockToPowerAttack") && doc["blockToPowerAttack"].IsBool())
-            g_settings.blockToPowerAttack = doc["blockToPowerAttack"].GetBool();
-        if (doc.HasMember("disableJumpingAttack") && doc["disableJumpingAttack"].IsBool())
-            g_settings.disableJumpingAttack = doc["disableJumpingAttack"].GetBool();
-        if (doc.HasMember("debugPAPress") && doc["debugPAPress"].IsBool())
-            g_settings.debugPAPress = doc["debugPAPress"].GetBool();
-        if (doc.HasMember("debugPAActivate") && doc["debugPAActivate"].IsBool())
-            g_settings.debugPAActivate = doc["debugPAActivate"].GetBool();
-
-        logger::info("Configurações carregadas com sucesso.");
+    if (doc.HasParseError() || !doc.IsObject()) {
+        logger::error("Falha ao analisar o arquivo de configurações. Usando valores padrão.");
+        return;
     }
 
+    if (doc.HasMember("allowZeroStamina") && doc["allowZeroStamina"].IsBool())
+        g_settings.allowZeroStamina = doc["allowZeroStamina"].GetBool();
+    if (doc.HasMember("onlyDuringAttack") && doc["onlyDuringAttack"].IsBool())
+        g_settings.onlyDuringAttack = doc["onlyDuringAttack"].GetBool();
+    if (doc.HasMember("disableBlockDuringAttack") && doc["disableBlockDuringAttack"].IsBool())
+        g_settings.disableBlockDuringAttack = doc["disableBlockDuringAttack"].GetBool();
+    if (doc.HasMember("queuePA") && doc["queuePA"].IsBool()) g_settings.queuePA = doc["queuePA"].GetBool();
+    if (doc.HasMember("notifyWindow") && doc["notifyWindow"].IsBool())
+        g_settings.notifyWindow = doc["notifyWindow"].GetBool();
+    if (doc.HasMember("notifyDuration") && doc["notifyDuration"].IsFloat())
+        g_settings.notifyDuration = doc["notifyDuration"].GetFloat();
+    if (doc.HasMember("queuePAExpire") && doc["queuePAExpire"].IsFloat())
+        g_settings.queuePAExpire = doc["queuePAExpire"].GetFloat();
+    if (doc.HasMember("enableComboKey") && doc["enableComboKey"].IsBool())
+        g_settings.enableComboKey = doc["enableComboKey"].GetBool();
+    if (doc.HasMember("holdToPowerAttackMode") && doc["holdToPowerAttackMode"].IsInt())
+        g_settings.holdToPowerAttackMode = doc["holdToPowerAttackMode"].GetInt();
+    if (doc.HasMember("lightAttackToPowerAttack") && doc["lightAttackToPowerAttack"].IsBool())
+        g_settings.lightAttackToPowerAttack = doc["lightAttackToPowerAttack"].GetBool();
+    if (doc.HasMember("blockToPowerAttack") && doc["blockToPowerAttack"].IsBool())
+        g_settings.blockToPowerAttack = doc["blockToPowerAttack"].GetBool();
+    if (doc.HasMember("disableJumpingAttack") && doc["disableJumpingAttack"].IsBool())
+        g_settings.disableJumpingAttack = doc["disableJumpingAttack"].GetBool();
+    if (doc.HasMember("enableDirectionalPowerAttack") && doc["enableDirectionalPowerAttack"].IsBool())
+        g_settings.enableDirectionalPowerAttack = doc["enableDirectionalPowerAttack"].GetBool();
 
-    
+    // Carrega as novas configurações de teclas
+    if (doc.HasMember("powerAttackKey_k") && doc["powerAttackKey_k"].IsInt())
+        g_settings.powerAttackKey_k = doc["powerAttackKey_k"].GetInt();
+    if (doc.HasMember("powerAttackKey_g") && doc["powerAttackKey_g"].IsInt())
+        g_settings.powerAttackKey_g = doc["powerAttackKey_g"].GetInt();
+    if (doc.HasMember("comboKey_k") && doc["comboKey_k"].IsInt()) g_settings.comboKey_k = doc["comboKey_k"].GetInt();
+    if (doc.HasMember("comboKey_g") && doc["comboKey_g"].IsInt()) g_settings.comboKey_g = doc["comboKey_g"].GetInt();
 
+    if (doc.HasMember("debugPAPress") && doc["debugPAPress"].IsBool())
+        g_settings.debugPAPress = doc["debugPAPress"].GetBool();
+    if (doc.HasMember("debugPAActivate") && doc["debugPAActivate"].IsBool())
+        g_settings.debugPAActivate = doc["debugPAActivate"].GetBool();
 
+    logger::info("Configurações carregadas do JSON. Sincronizando com o jogo...");
+    SyncGlobals();  // PUSH para as Globals do Papyrus após carregar
+}
 
 void __stdcall SettingsMenu::Render() {
     bool settings_changed = false;
@@ -282,77 +305,160 @@ void __stdcall SettingsMenu::Render() {
     if (ImGui::BeginTabBar("SettingsTabs")) {
         if (ImGui::BeginTabItem("Geral")) {
             ImGui::Spacing();
-
             if (ImGui::Checkbox("Permitir ataque poderoso com estamina zero", &g_settings.allowZeroStamina))
                 settings_changed = true;
-            if (ImGui::Checkbox("Tecla 'V' só funciona durante um ataque", &g_settings.onlyDuringAttack))
+            if (ImGui::Checkbox("Tecla de atalho só funciona durante um ataque", &g_settings.onlyDuringAttack))
                 settings_changed = true;
             if (ImGui::Checkbox("Desativar bloqueio durante ataque", &g_settings.disableBlockDuringAttack))
                 settings_changed = true;
             if (ImGui::Checkbox("Impedir ataque durante o pulo", &g_settings.disableJumpingAttack))
                 settings_changed = true;
-
+            ImGui::Separator();
+            // --- NOVA CHECKBOX ---
+            if (ImGui::Checkbox("Habilitar Ataque Poderoso Direcional", &g_settings.enableDirectionalPowerAttack))
+                settings_changed = true;
+            ImGui::SameLine();
+            ImGui::TextDisabled("(?)");
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip(
+                    "Faz com que a tecla de atalho inicie um ataque poderoso direcional.\nIsso é necessário para "
+                    "garantir a compatibilidade total com o sistema de combos do BFCO.");
+            }
             ImGui::EndTabItem();
         }
 
         if (ImGui::BeginTabItem("Combos e Fila")) {
             ImGui::Spacing();
-
-            if (ImGui::Checkbox("Habilitar tecla de combo (Clique Direito)", &g_settings.enableComboKey))
-                settings_changed = true;
+            if (ImGui::Checkbox("Habilitar tecla de combo", &g_settings.enableComboKey)) settings_changed = true;
             if (ImGui::Checkbox("Enfileirar ataque poderoso se a animação não estiver pronta", &g_settings.queuePA))
                 settings_changed = true;
             ImGui::SetNextItemWidth(200.0f);
             if (ImGui::SliderFloat("Tempo de expiração da fila (s)", &g_settings.queuePAExpire, 0.1f, 1.0f, "%.2f s"))
                 settings_changed = true;
-
             ImGui::Separator();
             ImGui::Spacing();
             ImGui::Text("Ataque Poderoso ao Segurar Botão");
-            if (ImGui::Checkbox("Segurar Ataque Leve para Ataque Poderoso", &g_settings.lightAttackToPowerAttack))
+            ImGui::SetNextItemWidth(250.0f);
+            const char* items[] = {"Desativado", "Segurar Ataque Leve", "Segurar Bloqueio"};
+            if (ImGui::Combo("Modo", &g_settings.holdToPowerAttackMode, items, sizeof(items) / sizeof(items[0]))) {
                 settings_changed = true;
-            if (ImGui::Checkbox("Segurar Bloqueio para Ataque Poderoso (Vanilla)", &g_settings.blockToPowerAttack))
-                settings_changed = true;
+            }
+            ImGui::EndTabItem();
+        }
+
+        // --- NOVA ABA DE TECLAS ---
+        if (ImGui::BeginTabItem("Teclas")) {
+            ImGui::Spacing();
+            ImGui::Text("Define a tecla para ativar o ataque poderoso diretamente.");
+            Keybind("Ataque Poderoso (Teclado)", &g_settings.powerAttackKey_k);
+            GamepadKeybind("Ataque Poderoso (Controle)", &g_settings.powerAttackKey_g);
+
+            ImGui::Separator();
+            ImGui::Spacing();
+            ImGui::Text("Define a tecla para ser pressionada na janela de combo.");
+            Keybind("Tecla de Combo (Teclado)", &g_settings.comboKey_k);
+            GamepadKeybind("Tecla de Combo (Controle)", &g_settings.comboKey_g);
 
             ImGui::EndTabItem();
         }
 
-        if (ImGui::BeginTabItem("Visual e Debug")) {
+        /*if (ImGui::BeginTabItem("Visual e Debug")) {
             ImGui::Spacing();
-
             if (ImGui::Checkbox("Mostrar efeito visual na janela de ataque", &g_settings.notifyWindow))
                 settings_changed = true;
             ImGui::SetNextItemWidth(200.0f);
             if (ImGui::SliderFloat("Duração do efeito visual (s)", &g_settings.notifyDuration, 0.01f, 0.5f, "%.2f s"))
                 settings_changed = true;
-
             ImGui::Separator();
             ImGui::Spacing();
-            if (ImGui::Checkbox("[Debug] Tocar som ao pressionar tecla 'V'", &g_settings.debugPAPress))
+            if (ImGui::Checkbox("[Debug] Tocar som ao pressionar tecla de atalho", &g_settings.debugPAPress))
                 settings_changed = true;
             if (ImGui::Checkbox("[Debug] Tocar som na ativação do ataque poderoso", &g_settings.debugPAActivate))
                 settings_changed = true;
-
             ImGui::EndTabItem();
-        }
+        }*/
 
         ImGui::EndTabBar();
     }
 
-    // Se qualquer configuração mudou, salva no arquivo
     if (settings_changed) {
         Save();
+        SyncGlobals();  // PUSH para as Globals do Papyrus após alterar na UI
     }
 }
 
-// Função para registrar o menu no SKSE Menu Framework
 void SettingsMenu::Register() {
     if (!SKSEMenuFramework::IsInstalled()) {
         logger::warn("SKSE Menu Framework não foi encontrado. O menu de configurações não estará disponível.");
         return;
     }
-
     SKSEMenuFramework::SetSection("BFCO Power Attack");
     SKSEMenuFramework::AddSectionItem("Configurações", Render);
     logger::info("Menu de configurações registrado com sucesso.");
+}
+
+// --- FUNÇÕES DE KEYBINDING (do seu exemplo) ---
+void SettingsMenu::Keybind(const char* label, int* dx_key_ptr) {
+    static std::map<const char*, bool> is_waiting_map;
+    bool& is_waiting_for_key = is_waiting_map[label];
+
+    const char* button_text = "[Nenhuma]";
+    if (g_dx_to_name_map.count(*dx_key_ptr)) {
+        button_text = g_dx_to_name_map.at(*dx_key_ptr);
+    }
+
+    if (is_waiting_for_key) {
+        button_text = "[ ... ]";
+    }
+    ImGui::AlignTextToFramePadding();
+    ImGui::Text("%s", label);
+    ImGui::SameLine();
+    if (ImGui::Button(button_text, ImVec2(120, 0))) {
+        is_waiting_for_key = true;
+    }
+
+    if (is_waiting_for_key) {
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            *dx_key_ptr = 0;
+            is_waiting_for_key = false;
+        } else {
+            for (const auto& pair : g_imgui_to_dx_map) {
+                if (ImGui::IsKeyPressed(pair.first)) {
+                    *dx_key_ptr = pair.second;
+                    is_waiting_for_key = false;
+                    Save();  // Salva automaticamente ao mudar a tecla
+                    break;
+                }
+            }
+        }
+    }
+}
+
+void SettingsMenu::GamepadKeybind(const char* label, int* dx_key_ptr) {
+    const char* current_button_name = "[Nenhum]";
+    if (g_gamepad_dx_to_name_map.count(*dx_key_ptr)) {
+        current_button_name = g_gamepad_dx_to_name_map.at(*dx_key_ptr);
+    }
+
+    ImGui::AlignTextToFramePadding();
+    ImGui::Text("%s", label);
+    ImGui::SameLine();
+    std::string combo_id = "##";
+    combo_id += label;
+
+    if (ImGui::BeginCombo(combo_id.c_str(), current_button_name)) {
+        for (const auto& pair : g_gamepad_dx_to_name_map) {
+            const bool is_selected = (*dx_key_ptr == pair.first);
+            if (ImGui::Selectable(pair.second, is_selected)) {
+                if (*dx_key_ptr != pair.first) {
+                    *dx_key_ptr = pair.first;
+                    Save();  // Salva automaticamente
+                }
+            }
+            if (is_selected) {
+                ImGui::SetItemDefaultFocus();
+            }
+        }
+        ImGui::EndCombo();
+    }
 }

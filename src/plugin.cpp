@@ -37,6 +37,7 @@ BGSAction* actionRightAttack;
 TESEffectShader* notifyFX = nullptr;
 BGSAction* queuePAAction = nullptr;
 bool isAttacking = false;
+bool g_isPowerComboWindowOpen = false;
 bool attackWindow = false;
 float paQueueTime = 0.f;
 bool g_isComboWindowOpen = false;
@@ -55,11 +56,13 @@ const std::string BFCO_DIY_EndLoop = "BFCO_DIY_EndLoop";
 const BSFixedString Bfco_AttackStartFX("Bfco_AttackStartFX");  // Evento que abre a janela de combo
 const BSFixedString HitFrame("HitFrame"); 
 
-constexpr std::string_view ESP_NAME = "SCSI-ACTbfco-Main.esp";
-constexpr std::string_view BFCO_Powerattack = "bfcoTG_DirPowerAttack";
-constexpr std::string_view BFCO_jumpattack = "bfcoDebug_DisJumpAttack";
-inline RE::TESGlobal* DirPowerAttack = nullptr;
-inline RE::TESGlobal* DisableJumpAttack = nullptr;  
+constexpr std::string_view BFCO_Powerattack_ID = "bfcoTG_DirPowerAttack";
+constexpr std::string_view BFCO_LmbPowerAttack_ID = "bfcoTG_LmbPowerAttackNUM";  // ID da imagem
+constexpr std::string_view BFCO_RmbPowerAttack_ID = "bfcoTG_RmbPowerAttackNUM";  // ID da imagem
+constexpr std::string_view BFCO_KeyAttackComb_ID = "bfcoTG_KeyAttackComb";       // ID da imagem
+constexpr std::string_view BFCO_DisJumpAttack_ID = "bfcoDebug_DisJumpAttack";
+
+
 
 // Função para obter um Form (efeito, som, etc.) de um plugin .esp/.esl
 TESForm* GetFormFromMod(const std::string& modname, uint32_t formid) {
@@ -140,6 +143,8 @@ void PowerAttack() {
         return;
     }
 
+    
+
     PerformAction(actionRightPowerAttack, p);
 }
 
@@ -147,67 +152,48 @@ void PowerAttack() {
 // Hook para eventos de animação
 class HookAnimGraphEvent {
 public:
+    typedef BSEventNotifyControl (HookAnimGraphEvent::*FnReceiveEvent)(BSAnimationGraphEvent*,
+                                                                       BSTEventSource<BSAnimationGraphEvent>*);
+
     BSEventNotifyControl ReceiveEventHook(BSAnimationGraphEvent* evn, BSTEventSource<BSAnimationGraphEvent>* src) {
         if (evn && evn->holder) {
-            DirPowerAttack->value = 0.0f;
-            const Actor* a = evn->holder->As<Actor>();
+            auto a = evn->holder->As<Actor>();
             if (a && a->IsPlayerRef()) {
+                // Sincroniza 'isAttacking' com o estado real do motor do jogo.
                 ATTACK_STATE_ENUM currentState = (a->AsActorState()->actorState1.meleeAttackState);
                 isAttacking = (currentState >= ATTACK_STATE_ENUM::kDraw && currentState <= ATTACK_STATE_ENUM::kBash);
-                const char* eventTag = evn->tag.c_str();
-                if (strcmp(eventTag, Bfco_AttackStartFX.c_str()) == 0) {  // A lógica do Bfco_AttackStartFX permanece
-                    log::info("Evento 'Bfco_AttackStartFX' detectado. Janela de combo ABERTA.");
-                    g_isComboWindowOpen = true;
-                } else if (strcmp(eventTag, MCOWinOpen.c_str()) == 0 ||
-                           strcmp(eventTag, BFCO_NextWinStart.c_str()) == 0) {
-                    attackWindow = true;
-                    if (g_settings.notifyWindow && notifyFX) {
-                        using InstantiateHitShader_t = RE::ShaderReferenceEffect*(
-                            RE::TESObjectREFR*, RE::TESEffectShader*, float, bool, bool, RE::NiAVObject*);
-                        REL::Relocation<InstantiateHitShader_t> func{RELOCATION_ID(33271, 34029)};
-                        func(p, notifyFX, g_settings.notifyDuration, false, false, nullptr);
-                    }
-                }
-                // [ALTERADO] Verifica tanto pelo evento do MCO quanto do BFCO para FECHAR a janela
-                else if (strcmp(eventTag, MCOWinClose.c_str()) == 0 ||
-                         strcmp(eventTag, BFCO_DIY_EndLoop.c_str()) == 0) {
-                    attackWindow = false;
-                    if (g_isComboWindowOpen) {
-                        log::info("Janela de ataque fechada. Janela de combo FECHADA.");
-                        g_isComboWindowOpen = false;
-                    }
-                }
-                // [ALTERADO] Lógica para o ataque poderoso enfileirado
-                else if (IsPAQueued()) {
-                    // Verifica se o evento é uma janela de abertura OU fechamento de ataque poderoso de QUALQUER um dos
-                    // mods
-                    bool isPowerWinOpen = (strcmp(eventTag, MCOPowerWinOpen.c_str()) == 0 ||
-                                           strcmp(eventTag, BFCO_NextPowerWinStart.c_str()) == 0);
-                    bool isPowerWinClose =
-                        (strcmp(eventTag, MCOPowerWinClose.c_str()) == 0 ||
-                         strcmp(eventTag, BFCO_DIY_EndLoop.c_str()) == 0);  // BFCO usa o mesmo evento para fechar
 
-                    if (isPowerWinOpen || isPowerWinClose) {
-                        PerformAction(queuePAAction, p);
+                const char* eventTag = evn->tag.c_str();
+
+                // --- LÓGICA DO "SENSOR" ATIVADA PELOS EVENTOS MCO ---
+                if (strcmp(eventTag, MCOPowerWinOpen.c_str()) == 0) {
+                    log::info("Evento 'MCO_PowerWinOpen' detectado. Sensor de combo de Power Attack LIGADO.");
+                    g_isPowerComboWindowOpen = true;
+                } else if (strcmp(eventTag, MCOPowerWinClose.c_str()) == 0 ||
+                           strcmp(eventTag, MCOWinClose.c_str()) == 0) {
+                    if (g_isPowerComboWindowOpen) {
+                        log::info("Evento de fechamento detectado. Sensor de combo de Power Attack DESLIGADO.");
+                        g_isPowerComboWindowOpen = false;
                     }
                 }
             }
         }
-
-        REL::Relocation<uintptr_t> vtable{VTABLE_PlayerCharacter[2]};
-        return (this->*fnHash.at(vtable.address()))(evn, src);
+        FnReceiveEvent fn = fnHash.at(*(uintptr_t*)this);
+        return fn ? (this->*fn)(evn, src) : BSEventNotifyControl::kContinue;
     }
+
     static void Hook() {
         REL::Relocation<uintptr_t> vtable{VTABLE_PlayerCharacter[2]};
-        auto original_function = vtable.write_vfunc(1, &HookAnimGraphEvent::ReceiveEventHook);
-        fnHash[vtable.address()] =
-            stl::unrestricted_cast<decltype(&HookAnimGraphEvent::ReceiveEventHook)>(original_function);
+        FnReceiveEvent fn =
+            stl::unrestricted_cast<FnReceiveEvent>(vtable.write_vfunc(1, &HookAnimGraphEvent::ReceiveEventHook));
+        fnHash.insert(std::pair<uintptr_t, FnReceiveEvent>(vtable.address(), fn));
+        logger::info("HookAnimGraphEvent (com sensor de Power Combo) instalado.");
     }
 
 private:
-    static std::unordered_map<uintptr_t, decltype(&HookAnimGraphEvent::ReceiveEventHook)> fnHash;
+    static std::unordered_map<uintptr_t, FnReceiveEvent> fnHash;
 };
-std::unordered_map<uintptr_t, decltype(&HookAnimGraphEvent::ReceiveEventHook)> HookAnimGraphEvent::fnHash;
+std::unordered_map<uintptr_t, HookAnimGraphEvent::FnReceiveEvent> HookAnimGraphEvent::fnHash;
 
 // --- Manipulador de Input (Onde a tecla 'V' é detectada) ---
 class InputEventHandler : public BSTEventSink<InputEvent*> {
@@ -228,74 +214,41 @@ public:
         if (!g_settings.allowZeroStamina && p->AsActorValueOwner()->GetActorValue(ActorValue::kStamina) <= 0)
             return BSEventNotifyControl::kContinue;
 
+         
+
         for (InputEvent* e = *evns; e; e = e->next) {
-            if (e->eventType == INPUT_EVENT_TYPE::kButton) {
-                ButtonEvent* btn = e->AsButtonEvent();
-                if (!btn) continue;
+            if (e->eventType != INPUT_EVENT_TYPE::kButton) continue;
+            ButtonEvent* btn = e->AsButtonEvent();
+            if (!btn || !btn->IsDown()) continue;
 
-                // --- [NOVO] Lógica para Ataque Poderoso segurando o mouse ---
-                // Verifica se um dos modos de ataque poderoso pelo mouse está ativo.
-                if (g_settings.lightAttackToPowerAttack || g_settings.blockToPowerAttack) {
-                    // Botão Esquerdo (Ataque Leve)
-                    if (btn->device.get() == INPUT_DEVICE::kMouse && btn->GetIDCode() == 0 &&
-                        g_settings.lightAttackToPowerAttack) {
-                        if (btn->IsDown()) {
-                            g_lmbDownTime = *ptr_engineTime;  // Armazena o tempo que o botão foi pressionado
-                        } else if (btn->IsUp() && g_lmbDownTime > 0) {
-                            // Se o botão foi solto antes do tempo de "hold", realiza um ataque normal.
-                            if (*ptr_engineTime - g_lmbDownTime < HOLD_DURATION_FOR_POWER_ATTACK) {
-                                PerformAction(actionRightAttack, p);
-                            }
-                            g_lmbDownTime = 0.0f;  // Reseta o tempo
-                        }
-                    }
-                    // Botão Direito (Bloqueio)
-                    if (btn->device.get() == INPUT_DEVICE::kMouse && btn->GetIDCode() == 1 &&
-                        g_settings.blockToPowerAttack) {
-                        if (btn->IsDown()) {
-                            g_rmbDownTime = *ptr_engineTime;
-                        } else if (btn->IsUp()) {
-                            // A lógica de soltar o botão direito é complexa (pode ser bloqueio),
-                            // então o ataque poderoso só é ativado no "Update" abaixo.
-                            g_rmbDownTime = 0.0f;
-                        }
-                    }
-                }
-                // Checagem contínua para ver se o tempo de "hold" foi atingido
-                if (g_lmbDownTime > 0 && (*ptr_engineTime - g_lmbDownTime >= HOLD_DURATION_FOR_POWER_ATTACK)) {
-                    log::info("Ataque poderoso ativado pelo botão esquerdo do mouse (hold).");
-                    PowerAttack();
-                    g_lmbDownTime = 0.0f;                // Reseta para não disparar de novo
-                    return BSEventNotifyControl::kStop;  // Consome o input
-                }
-                if (g_rmbDownTime > 0 && (*ptr_engineTime - g_rmbDownTime >= HOLD_DURATION_FOR_POWER_ATTACK)) {
-                    log::info("Ataque poderoso ativado pelo botão direito do mouse (hold).");
-                    PowerAttack();
-                    g_rmbDownTime = 0.0f;
-                    return BSEventNotifyControl::kStop;
-                }
+            auto device = btn->device.get();
+            uint32_t id = btn->GetIDCode();
 
-                // --- Lógica Original + Checagem das Configurações ---
-                if (btn->IsDown()) {
-                    // PRIORIDADE 1: Power Attack com a tecla 'V'
-                    if (btn->device.get() == INPUT_DEVICE::kKeyboard && btn->GetIDCode() == 47) {  // Tecla V
-                        log::info("--- Tecla V Pressionada ---");
-                        PowerAttack();
-                        return BSEventNotifyControl::kStop;
-                    }
-                    // PRIORIDADE 2: Lógica de Combo com o botão direito
-                    // [ALTERADO] Adicionada verificação da configuração 'enableComboKey'
-                    else if (g_settings.enableComboKey && btn->device.get() == INPUT_DEVICE::kMouse &&
-                             btn->GetIDCode() == 1 && g_isComboWindowOpen) {
-                        log::info("Input de combo bem-sucedido! (Clique Direito)");
+            // Lógica da Tecla de Atalho (usando as configurações)
+            bool powerAttackPressed = (device == INPUT_DEVICE::kKeyboard && id == g_settings.powerAttackKey_k &&
+                                       g_settings.powerAttackKey_k != 0) ||
+                                      (device == INPUT_DEVICE::kGamepad && id == g_settings.powerAttackKey_g &&
+                                       g_settings.powerAttackKey_g != 0);
 
-                        p->SetGraphVariableBool("BFCO_ComboSuccess", true);
-                        g_isComboWindowOpen = false;
+            if (powerAttackPressed) {
+                // --- AQUI ESTÁ O "SWITCH" INTELIGENTE ---
+                if (g_isPowerComboWindowOpen) {
+                    // Se o sensor está LIGADO, significa que estamos no meio de um combo.
+                    // O gráfico de animação já sabe o que fazer, só precisa do gatilho.
+                    log::info("Sensor LIGADO. Continuando combo de Power Attack (PA2, PA3...).");
+                    PerformAction(actionRightPowerAttack, p);
 
-                        return BSEventNotifyControl::kStop;
-                    }
+                    // "Consumimos" a janela de combo para evitar ataques múltiplos com um só clique.
+                    g_isPowerComboWindowOpen = false;
+                } else {
+                    // Se o sensor está DESLIGADO, este é o primeiro ataque.
+                    log::info("Sensor DESLIGADO. Iniciando novo combo de Power Attack (PA1).");
+                    PowerAttack();  // Usamos a função completa para as checagens de segurança.
                 }
+                return BSEventNotifyControl::kStop;  // Consome o input em ambos os casos.
             }
+
+            // A lógica de "Segurar para atacar" e de "Desativar bloqueio" pode ser adicionada aqui se necessário.
         }
         return BSEventNotifyControl::kContinue;
     }
@@ -313,13 +266,13 @@ SKSEPluginLoad(const LoadInterface* skse) {
     g_message = GetMessagingInterface();
     g_message->RegisterListener([](MessagingInterface::Message* msg) -> void {
         if (msg->type == MessagingInterface::kDataLoaded) {
-            DirPowerAttack =
-                RE::TESForm::LookupByEditorID<RE::TESGlobal>(BFCO_Powerattack);
-            if (!DirPowerAttack) {
-                SKSE::log::critical("Nao foi possivel encontrar a Variavel Global com EditorID: {}",
-                                    BFCO_Powerattack);
-                return;
-            }
+            DirPowerAttack = RE::TESForm::LookupByEditorID<RE::TESGlobal>(BFCO_Powerattack_ID);
+            Global_LmbPowerAttack = RE::TESForm::LookupByEditorID<RE::TESGlobal>(BFCO_LmbPowerAttack_ID);
+            Global_RmbPowerAttack = RE::TESForm::LookupByEditorID<RE::TESGlobal>(BFCO_RmbPowerAttack_ID);
+            Global_KeyAttackComb = RE::TESForm::LookupByEditorID<RE::TESGlobal>(BFCO_KeyAttackComb_ID);
+            Global_DisJumpAttack = RE::TESForm::LookupByEditorID<RE::TESGlobal>(BFCO_DisJumpAttack_ID);
+
+            logger::info("Variaveis globais carregadas.");
             p = PlayerCharacter::GetSingleton();
             mm = RE::UI::GetSingleton();
             im = ControlMap::GetSingleton();

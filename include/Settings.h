@@ -1,7 +1,7 @@
 #pragma once
+#include <string>
 
 // Estrutura que centraliza todas as configurações do mod.
-// Isso substitui as variáveis globais 'const' que você tinha.
 struct Settings {
     // --- Configurações Gerais de Ataque Poderoso ---
     bool allowZeroStamina = true;
@@ -16,13 +16,22 @@ struct Settings {
 
     // --- Configurações do BFCO ---
     bool enableComboKey = true;
+    int holdToPowerAttackMode = 0;
     bool lightAttackToPowerAttack = false;
     bool blockToPowerAttack = false;
     bool disableJumpingAttack = false;
+    bool enableDirectionalPowerAttack = false;
 
     // --- Configurações de Debug ---
     bool debugPAPress = false;
     bool debugPAActivate = false;
+
+    // --- NOVAS: Configurações de Teclas (Hotkeys) ---
+    // Valores padrão: V para ataque poderoso, Clique Direito para combo.
+    int powerAttackKey_k = 47;  // Teclado (V)
+    int powerAttackKey_g = 0;   // Controle (Nenhum)
+    int comboKey_k = 301;       // Teclado (Mouse Direito)
+    int comboKey_g = 512;       // Controle (RB / R1)
 };
 
 extern Settings g_settings;
