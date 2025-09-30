@@ -12,7 +12,8 @@
     "clib-utils-qtr",
     "skyprompt-api",
     "directxtk",
-    "skse-mcp"
+    "skse-mcp",
+    "rapidjson"
   ],
   "overrides": [
     {
