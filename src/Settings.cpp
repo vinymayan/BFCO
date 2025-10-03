@@ -138,10 +138,10 @@ namespace BFCOMenu {
             if (global) {
                 global->value = value;
             } else {
-                SKSE::log::warn("Nao foi possivel encontrar a GlobalVariable: {}", editorID);
+                //SKSE::log::warn("Nao foi possivel encontrar a GlobalVariable: {}", editorID);
             }
         }
-        SKSE::log::info("Variaveis Globais do BFCO atualizadas com sucesso.");
+        //SKSE::log::info("Variaveis Globais do BFCO atualizadas com sucesso.");
     }
 
     // Salva as configurações em JSON
