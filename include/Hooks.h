@@ -18,6 +18,7 @@ private:
 
     bool inAttackComboWindow = false;
     bool isAttacking = false;
+    bool isPlayerSprinting = false;
 };
 
 enum class WeaponState {
@@ -29,5 +30,8 @@ enum class WeaponState {
     Invalid            // Estado inválido para bloqueio (ex: magia na mão)
 };
 extern RE::BGSAction* PowerRight;
+extern RE::BGSAction* PowerStanding;
 extern RE::BGSAction* PowerLeft;
 extern RE::BGSAction* PowerDual;
+extern RE::BGSAction* NormalAttack;
+

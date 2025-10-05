@@ -5,11 +5,13 @@
 
 namespace Settings {
     // Checkboxes (baseado no seu MCM)
+
     inline bool bEnableComboAttack = true;
     inline bool bEnableDirectionalAttack = true;
     inline bool bEnableLmbPowerAttack = false;
     inline bool bEnableRmbPowerAttack = false;
     inline bool bDisableJumpingAttack = false;
+    inline bool bPowerAttackLMB = false;
 
     // Keybinds (separados para teclado e controle)
     // Os valores padrão podem ser ajustados conforme necessário. Usei códigos de tecla comuns.
@@ -20,6 +22,8 @@ namespace Settings {
     inline uint32_t PowerAttackKey_k = 18;  // Teclado (E)
     inline uint32_t PowerAttackKey_m = 0;      
     inline uint32_t PowerAttackKey_g = 512;  // Controle (LB / L1)
+    inline bool hasCMF = false;
+    inline bool lockSprintAttack = false;
 }
 
 // Namespace para organizar as funções do nosso menu
@@ -251,7 +255,22 @@ const std::map<int, const char*> g_dx_to_name_map = {
     {260, "Mouse 5"},
     {261, "Mouse 6"},
     {262, "Mouse 7"},
-    {263, "Mouse 8"}
+    {263, "Mouse 8"},
+    {55, "Keypad *"}, 
+    {181, "Keypad /"},
+    {74, "Keypad -"},  // <-- ADICIONADO
+    {78, "Keypad +"},  // <-- ADICIONADO
+    {73, "Keypad 9"},  // <-- ADICIONADO
+    {72, "Keypad 8"},  // <-- ADICIONADO
+    {71, "Keypad 7"},  // <-- ADICIONADO
+    {77, "Keypad 6"},  // <-- ADICIONADO
+    {76, "Keypad 5"},  // <-- ADICIONADO
+    {75, "Keypad 4"},  // <-- ADICIONADO
+    {81, "Keypad 3"},  // <-- ADICIONADO
+    {80, "Keypad 2"},  // <-- ADICIONADO
+    {79, "Keypad 1"},  // <-- ADICIONADO
+    {82, "Keypad 0"},  // <-- ADICIONADO
+    {83, "Keypad ."},  // <-- ADICIONADO
     //{261, "Scroll Up"},
     //{262, "Scroll Down"}
     // Adicionei a key 0 para o caso "Nenhuma" para simplificar.

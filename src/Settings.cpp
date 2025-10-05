@@ -109,6 +109,8 @@ namespace BFCOMenu {
         if (ImGui::Checkbox("Ativar Ataque Carregado (Clique Direito)", &Settings::bEnableRmbPowerAttack))
             settings_changed = true;*/
         if (ImGui::Checkbox("Disable jump attack", &Settings::bDisableJumpingAttack)) settings_changed = true;
+        if (ImGui::Checkbox("Disable power attack LMB", &Settings::bPowerAttackLMB)) settings_changed = true;
+        if (ImGui::Checkbox("Lock sprint attack behind perk", &Settings::lockSprintAttack)) settings_changed = true;
 
         if (settings_changed) {
             SaveSettings();
@@ -122,15 +124,16 @@ namespace BFCOMenu {
             SKSE::log::error("Falha ao obter TESDataHandler para atualizar Globals.");
             return;
         }
-
+        const std::string bfco = "SCSI-ACTbfco-Main.esp";
         // Mapeia nossas variáveis C++ para os EditorIDs das Globals no .esp
         std::map<const char*, float> globalsToUpdate = {
-            {"BFCO_Global_bKeyAttackComb", Settings::bEnableComboAttack ? 1.0f : 0.0f},
+            {"bfcoTG_KeyAttackComb", Settings::bEnableComboAttack ? 1.0f : 0.0f},
             {"BFCO_StrongAttackIsOK", 1.0f },
             //{"BFCO_Global_ComboKey",static_cast<float>(Settings::comboKey_k)},  // Supondo que o script use o valor do teclado
-            {"BFCO_Global_bDirectionalAttack", Settings::bEnableDirectionalAttack ? 1.0f : 0.0f},
-            /*{"BFCO_Global_DirectionalKey", static_cast<float>(Settings::PowerAttackKey_k)},*/
+            {"bfcoTG_DirPowerAttack", Settings::bEnableDirectionalAttack ? 1.0f : 0.0f},
+            //{"bfcoTG_LmbPowerAttackNUM", Settings::bPowerAttackLMB ? 0.0f : 1.0f},
             // Adicione outras Globals aqui conforme o MCM original
+            {"bfcoTG_LmbPowerAttackNUM", &Settings::bPowerAttackLMB ? 0.0f : 1.0f}
         };
 
         for (auto const& [editorID, value] : globalsToUpdate) {
@@ -138,9 +141,11 @@ namespace BFCOMenu {
             if (global) {
                 global->value = value;
             } else {
-                //SKSE::log::warn("Nao foi possivel encontrar a GlobalVariable: {}", editorID);
+                SKSE::log::warn("Nao foi possivel encontrar a GlobalVariable: {}", editorID);
             }
         }
+        
+
         //SKSE::log::info("Variaveis Globais do BFCO atualizadas com sucesso.");
     }
 
@@ -163,6 +168,8 @@ namespace BFCOMenu {
         /*doc.AddMember("bEnableLmbPowerAttack", Settings::bEnableLmbPowerAttack, allocator);
         doc.AddMember("bEnableRmbPowerAttack", Settings::bEnableRmbPowerAttack, allocator);*/
         doc.AddMember("bDisableJumpingAttack", Settings::bDisableJumpingAttack, allocator);
+        doc.AddMember("bPowerAttackLMB", Settings::bPowerAttackLMB, allocator);
+        doc.AddMember("lockSprintAttack", Settings::lockSprintAttack, allocator);
 
         FILE* fp = nullptr;
         fopen_s(&fp, SETTINGS_PATH, "wb");
@@ -216,6 +223,10 @@ namespace BFCOMenu {
                     Settings::bEnableRmbPowerAttack = doc["bEnableRmbPowerAttack"].GetBool();*/
                 if (doc.HasMember("bDisableJumpingAttack") && doc["bDisableJumpingAttack"].IsBool())
                     Settings::bDisableJumpingAttack = doc["bDisableJumpingAttack"].GetBool();
+                if (doc.HasMember("bPowerAttackLMB") && doc["bPowerAttackLMB"].IsBool())
+                    Settings::bPowerAttackLMB = doc["bPowerAttackLMB"].GetBool();
+                if (doc.HasMember("lockSprintAttack") && doc["lockSprintAttack"].IsBool())
+                    Settings::lockSprintAttack = doc["lockSprintAttack"].GetBool();
             }
         }
         // Após carregar, sempre atualize as Globals do jogo

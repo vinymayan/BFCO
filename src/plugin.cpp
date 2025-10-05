@@ -1,6 +1,5 @@
 #include "Hooks.h"
-#include "Settings.h"
-
+#include "Events.h"
 // --- NOVAS VARIÁVEIS GLOBAIS ---
 // Ponteiro para a interface de tarefas do SKSE
 const SKSE::TaskInterface* g_task = nullptr;
@@ -13,16 +12,22 @@ const SKSE::TaskInterface* g_task = nullptr;
 void OnSKSEMessage(SKSE::MessagingInterface::Message* msg) {
     switch (msg->type) {
         case SKSE::MessagingInterface::kDataLoaded: {
+            IsCycleMovesetActive();
             AttackStateManager::GetSingleton()->Register();
             SKSE::log::info("Evento kDataLoaded recebido. Procurando BGSAction...");
             PowerRight = RE::TESForm::LookupByID<RE::BGSAction>(0x13383);
+            PowerStanding = RE::TESForm::LookupByID<RE::BGSAction>(0x19B26);
             PowerLeft = RE::TESForm::LookupByID<RE::BGSAction>(0x2E2F6);
             PowerDual = RE::TESForm::LookupByID<RE::BGSAction>(0x2E2F7);
+            NormalAttack = RE::TESForm::LookupByID<RE::BGSAction>(0x13005);
             BFCOMenu::Register();
             break;
         }
         case SKSE::MessagingInterface::kPostLoadGame:
+            BFCOMenu::UpdateGameGlobals();
+            break;
         case SKSE::MessagingInterface::kNewGame: {
+            BFCOMenu::UpdateGameGlobals();
             break;
         }
     }
