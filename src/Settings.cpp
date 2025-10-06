@@ -104,6 +104,12 @@ namespace BFCOMenu {
         ImGui::Separator();
         ImGui::Spacing();
 
+        RenderKeybind("Block Key (Beta)", &Settings::BlockKey_k, &Settings::BlockKey_m, &Settings::BlockKey_g);
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
         /*if (ImGui::Checkbox("Ativar Ataque Carregado (Clique Esquerdo)", &Settings::bEnableLmbPowerAttack))
             settings_changed = true;
         if (ImGui::Checkbox("Ativar Ataque Carregado (Clique Direito)", &Settings::bEnableRmbPowerAttack))
@@ -165,6 +171,10 @@ namespace BFCOMenu {
         doc.AddMember("PowerAttackKey_m", Settings::PowerAttackKey_m, allocator);
         doc.AddMember("PowerAttackKey_g", Settings::PowerAttackKey_g, allocator);
 
+        doc.AddMember("BlockKey_k", Settings::BlockKey_k, allocator);
+        doc.AddMember("BlockKey_m", Settings::BlockKey_m, allocator);
+        doc.AddMember("BlockKey_g", Settings::BlockKey_g, allocator);
+
         /*doc.AddMember("bEnableLmbPowerAttack", Settings::bEnableLmbPowerAttack, allocator);
         doc.AddMember("bEnableRmbPowerAttack", Settings::bEnableRmbPowerAttack, allocator);*/
         doc.AddMember("bDisableJumpingAttack", Settings::bDisableJumpingAttack, allocator);
@@ -216,6 +226,15 @@ namespace BFCOMenu {
 
                 if (doc.HasMember("PowerAttackKey_g") && doc["PowerAttackKey_g"].IsInt())
                     Settings::PowerAttackKey_g = doc["PowerAttackKey_g"].GetInt();
+
+                if (doc.HasMember("BlockKey_k") && doc["BlockKey_k"].IsInt())
+                    Settings::BlockKey_k = doc["BlockKey_k"].GetInt();
+
+                if (doc.HasMember("BlockKey_m") && doc["BlockKey_m"].IsInt())
+                    Settings::BlockKey_m = doc["BlockKey_m"].GetInt();
+
+                if (doc.HasMember("BlockKey_g") && doc["BlockKey_g"].IsInt())
+                    Settings::BlockKey_g = doc["BlockKey_g"].GetInt();
 
                 /*if (doc.HasMember("bEnableLmbPowerAttack") && doc["bEnableLmbPowerAttack"].IsBool())
                     Settings::bEnableLmbPowerAttack = doc["bEnableLmbPowerAttack"].GetBool();

@@ -8,6 +8,7 @@ extern const SKSE::TaskInterface* g_task;
 const std::string pluginName = "SCSI-ACTbfco-Main.esp";
 
 RE::BGSAction* PowerRight = nullptr;
+RE::BGSAction* PowerStanding = nullptr;
 RE::BGSAction* PowerLeft = nullptr;
 RE::BGSAction* PowerDual = nullptr;
 RE::BGSAction* NormalAttack = nullptr;
@@ -280,7 +281,8 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
         }
 
         if (IsAnyMenuOpen()) {
-            return RE::BSEventNotifyControl::kContinue; 
+        logger::info("menu aberto");
+            return RE::BSEventNotifyControl::kContinue;
         }
 
         auto device = buttonEvent->GetDevice();
@@ -289,6 +291,8 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
         const auto playerState = player->AsActorState();
         auto controlMap = RE::ControlMap::GetSingleton();
         auto sprintKey = controlMap->GetMappedKey("Sprint", device);
+        auto attackKey = controlMap->GetMappedKey("Block", device);
+        auto blockKey = controlMap->GetMappedKey("Attack", device);
 
         if (keyCode == sprintKey) {
             if (buttonEvent->IsDown()) {
@@ -315,21 +319,35 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
         WeaponState currentState = GetPlayerWeaponState(player);
 
         
-        bool isBlockButtonPressed = (device == RE::INPUT_DEVICE::kMouse && keyCode == MOUSE_BLOCK_BUTTON) ||
-                                    (device == RE::INPUT_DEVICE::kGamepad && keyCode == GAMEPAD_BLOCK_BUTTON);
-        bool isAttackButtonPressed = (device == RE::INPUT_DEVICE::kMouse && keyCode == MOUSE_ATTACK_BUTTON) ||
-                                     (device == RE::INPUT_DEVICE::kGamepad && keyCode == GAMEPAD_ATTACK_BUTTON);
+        bool isBlockButtonPressed = (device == RE::INPUT_DEVICE::kMouse && keyCode == blockKey) ||
+                                    (device == RE::INPUT_DEVICE::kGamepad && keyCode == blockKey ||
+                                     device == device == RE::INPUT_DEVICE::kKeyboard && keyCode == blockKey);
+        bool isAttackButtonPressed = (device == RE::INPUT_DEVICE::kMouse && keyCode == attackKey) ||
+                                     (device == RE::INPUT_DEVICE::kGamepad && keyCode == attackKey ||
+                                      device == device == RE::INPUT_DEVICE::kKeyboard && keyCode == attackKey);
 
 
-        
+        if (device == RE::INPUT_DEVICE::kMouse) {
+            keyCode += 256;  // Ajusta o código do mouse para corresponder às configurações
+        }
 
+        if (keyCode == Settings::BlockKey_g || keyCode == Settings::BlockKey_m || keyCode == Settings::BlockKey_k) {
+            if (buttonEvent->IsDown()) {
+                player->NotifyAnimationGraph("blockStart");
+                player->SetGraphVariableBool("IsBlocking", true);
+                return RE::BSEventNotifyControl::kStop;  // Consome o input
+            } else if (buttonEvent->IsUp()) {
+                player->SetGraphVariableBool("IsBlocking", false);
+                player->NotifyAnimationGraph("blockStop");
+                return RE::BSEventNotifyControl::kStop;  // Consome o input
+            }
+        }
+        '
         // 1. VERIFICAR AÇÕES CUSTOMIZADAS PRIMEIRO (APENAS QUANDO O BOTÃO É PRESSIONADO)
         if (buttonEvent->IsDown()) {
             bool powerAttackKeyPressed = false;
             bool comboKeyPressed = false;
-            if (device == RE::INPUT_DEVICE::kMouse) {
-                keyCode += 256;  // Ajusta o código do mouse para corresponder às configurações
-            }
+            
 
             if (device == RE::INPUT_DEVICE::kKeyboard) {
                 if (keyCode == Settings::PowerAttackKey_k) powerAttackKeyPressed = true;
@@ -341,6 +359,9 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                 if (keyCode == Settings::PowerAttackKey_m) powerAttackKeyPressed = true;
                 if (keyCode == Settings::comboKey_m) comboKeyPressed = true;
             }
+
+            
+
             if (powerAttackKeyPressed) {
 
                 if (Settings::lockSprintAttack && isPlayerSprinting) {
@@ -354,7 +375,16 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                             case WeaponState::Invalid:
                                 if (player->HasPerk(CriticalCharge)) {
                                     player->NotifyAnimationGraph("MCO_EndAnimation");
-                                    PerformAction(PowerRight, player);
+                                    if (player->IsMoving()) {
+                                        // Se o jogador estiver se movendo, faz um ataque normal.
+                                        PerformAction(PowerRight, player);
+                                    } else {
+                                        // Se o jogador estiver parado, faz um ataque de poder.
+                                        player->NotifyAnimationGraph("PowerAttack_Start_End");
+                                        if (auto* teste = GetIdleByFormID(0x8C5, pluginName)) {
+                                            PlayIdleAnimation(player, teste);
+                                        }
+                                    }
                                 } else {
                                     player->NotifyAnimationGraph("MCO_EndAnimation");
                                     PerformAction(NormalAttack, player);
@@ -363,7 +393,16 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                             case WeaponState::TwoHanded:
                                 if (player->HasPerk(GreatCriticalCharge)) {
                                     player->NotifyAnimationGraph("MCO_EndAnimation");
-                                    PerformAction(PowerDual, player);
+                                    if (player->IsMoving()) {
+                                        // Se o jogador estiver se movendo, faz um ataque normal.
+                                        PerformAction(PowerDual, player);
+                                    } else {
+                                        // Se o jogador estiver parado, faz um ataque de poder.
+                                        player->NotifyAnimationGraph("PowerAttack_Start_End");
+                                        if (auto* teste = GetIdleByFormID(0x8C5, pluginName)) {
+                                            PlayIdleAnimation(player, teste);
+                                        }
+                                    }
                                 } else {
                                     player->NotifyAnimationGraph("MCO_EndAnimation");
                                     PerformAction(NormalAttack, player);
@@ -371,7 +410,16 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                                 break;
                             default:  // Unarmed ou outros casos
                                 player->NotifyAnimationGraph("MCO_EndAnimation");
-                                PerformAction(PowerRight, player);
+                                if (player->IsMoving()) {
+                                    // Se o jogador estiver se movendo, faz um ataque normal.
+                                    PerformAction(PowerRight, player);
+                                } else {
+                                    // Se o jogador estiver parado, faz um ataque de poder.
+                                    player->NotifyAnimationGraph("PowerAttack_Start_End");
+                                    if (auto* teste = GetIdleByFormID(0x8C5, pluginName)) {
+                                        PlayIdleAnimation(player, teste);
+                                    }
+                                }
                                 break;
                         
                         
@@ -384,16 +432,42 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                         case WeaponState::Invalid:
                         case WeaponState::TwoHanded:
                             player->NotifyAnimationGraph("MCO_EndAnimation");
-                            PerformAction(PowerRight, player);
+                            if (player->IsMoving()) {
+                                // Se o jogador estiver se movendo, faz um ataque normal.
+                                PerformAction(PowerRight, player);
+                            } else {
+                                // Se o jogador estiver parado, faz um ataque de poder.
+                                player->NotifyAnimationGraph("PowerAttack_Start_End");
+                                if (auto* teste = GetIdleByFormID(0x8C5, pluginName)) {
+                                    PlayIdleAnimation(player, teste);
+                                }
+                            }
                             break;
                         case WeaponState::DualWield:
                             player->NotifyAnimationGraph("MCO_EndAnimation");
-                            PerformAction(PowerRight, player);
-
+                            if (player->IsMoving()) {
+                                // Se o jogador estiver se movendo, faz um ataque normal.
+                                PerformAction(PowerDual, player);
+                            } else {
+                                // Se o jogador estiver parado, faz um ataque de poder.
+                                player->NotifyAnimationGraph("PowerAttack_Start_End");
+                                if (auto* teste = GetIdleByFormID(0x8C5, pluginName)) {
+                                    PlayIdleAnimation(player, teste);
+                                }
+                            }
                             break;
                         default:  // Unarmed ou outros casos
                             player->NotifyAnimationGraph("MCO_EndAnimation");
-                            PerformAction(PowerRight, player);
+                            if (player->IsMoving()) {
+                                // Se o jogador estiver se movendo, faz um ataque normal.
+                                PerformAction(PowerRight, player);
+                            } else {
+                                // Se o jogador estiver parado, faz um ataque de poder.
+                                player->NotifyAnimationGraph("PowerAttack_Start_End");
+                                if (auto* teste = GetIdleByFormID(0x8C5, pluginName)) {
+                                    PlayIdleAnimation(player, teste);
+                                }
+                            }
                             break;
                     }
                 }

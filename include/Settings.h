@@ -22,6 +22,9 @@ namespace Settings {
     inline uint32_t PowerAttackKey_k = 18;  // Teclado (E)
     inline uint32_t PowerAttackKey_m = 0;      
     inline uint32_t PowerAttackKey_g = 512;  // Controle (LB / L1)
+    inline uint32_t BlockKey_k = -1;       // Teclado (E)
+    inline uint32_t BlockKey_m = -3;      
+    inline uint32_t BlockKey_g = 0;  // Controle (LB / L1)
     inline bool hasCMF = false;
     inline bool lockSprintAttack = false;
 }
