@@ -85,7 +85,7 @@ namespace BFCOMenu {
     void __stdcall Render() {
         bool settings_changed = false;
 
-        ImGui::Text("Combat config BFCO");
+        ImGui::Text("Combat settings BFCO");
         ImGui::Separator();
         ImGui::Spacing();
 
@@ -104,6 +104,7 @@ namespace BFCOMenu {
         ImGui::Separator();
         ImGui::Spacing();
 
+
         RenderKeybind("Block Key (Beta)", &Settings::BlockKey_k, &Settings::BlockKey_m, &Settings::BlockKey_g);
 
         ImGui::Spacing();
@@ -114,9 +115,9 @@ namespace BFCOMenu {
             settings_changed = true;
         if (ImGui::Checkbox("Ativar Ataque Carregado (Clique Direito)", &Settings::bEnableRmbPowerAttack))
             settings_changed = true;*/
-        if (ImGui::Checkbox("Disable jump attack", &Settings::bDisableJumpingAttack)) settings_changed = true;
-        if (ImGui::Checkbox("Disable power attack LMB", &Settings::bPowerAttackLMB)) settings_changed = true;
-        if (ImGui::Checkbox("Lock sprint attack behind perk", &Settings::lockSprintAttack)) settings_changed = true;
+        if (ImGui::Checkbox("Disable jump attack (Beta)", &Settings::bDisableJumpingAttack)) settings_changed = true;
+        if (ImGui::Checkbox("Disable power attack LMB (Beta)", &Settings::bPowerAttackLMB)) settings_changed = true;
+        //if (ImGui::Checkbox("Lock sprint attack behind perk", &Settings::lockSprintAttack)) settings_changed = true;
 
         if (settings_changed) {
             SaveSettings();
@@ -134,18 +135,20 @@ namespace BFCOMenu {
         // Mapeia nossas variáveis C++ para os EditorIDs das Globals no .esp
         std::map<const char*, float> globalsToUpdate = {
             {"bfcoTG_KeyAttackComb", Settings::bEnableComboAttack ? 1.0f : 0.0f},
+            {"bfcoDebug_DisJumpAttack", Settings::bDisableJumpingAttack ? 1.0f : 0.0f},
             {"BFCO_StrongAttackIsOK", 1.0f },
+            {"BFCO_NormalAttackIsOK", 1.0f },
             //{"BFCO_Global_ComboKey",static_cast<float>(Settings::comboKey_k)},  // Supondo que o script use o valor do teclado
             {"bfcoTG_DirPowerAttack", Settings::bEnableDirectionalAttack ? 1.0f : 0.0f},
-            //{"bfcoTG_LmbPowerAttackNUM", Settings::bPowerAttackLMB ? 0.0f : 1.0f},
             // Adicione outras Globals aqui conforme o MCM original
-            {"bfcoTG_LmbPowerAttackNUM", &Settings::bPowerAttackLMB ? 0.0f : 1.0f}
+            {"bfcoTG_LmbPowerAttackNUM", Settings::bPowerAttackLMB ? 0.0f : 1.0f}
         };
 
         for (auto const& [editorID, value] : globalsToUpdate) {
             RE::TESGlobal* global = RE::TESForm::LookupByEditorID<RE::TESGlobal>(editorID);
             if (global) {
                 global->value = value;
+                SKSE::log::info("Global '{}' atualizada para o valor: {}", editorID, value);
             } else {
                 SKSE::log::warn("Nao foi possivel encontrar a GlobalVariable: {}", editorID);
             }
@@ -174,6 +177,10 @@ namespace BFCOMenu {
         doc.AddMember("BlockKey_k", Settings::BlockKey_k, allocator);
         doc.AddMember("BlockKey_m", Settings::BlockKey_m, allocator);
         doc.AddMember("BlockKey_g", Settings::BlockKey_g, allocator);
+
+        //doc.AddMember("AttackKey_k", Settings::AttackKey_k, allocator);
+        //doc.AddMember("AttackKey_m", Settings::AttackKey_m, allocator);
+        //doc.AddMember("AttackKey_g", Settings::AttackKey_g, allocator);
 
         /*doc.AddMember("bEnableLmbPowerAttack", Settings::bEnableLmbPowerAttack, allocator);
         doc.AddMember("bEnableRmbPowerAttack", Settings::bEnableRmbPowerAttack, allocator);*/
@@ -218,23 +225,27 @@ namespace BFCOMenu {
 
                 if (doc.HasMember("bEnableDirectionalAttack") && doc["bEnableDirectionalAttack"].IsBool())
                     Settings::bEnableDirectionalAttack = doc["bEnableDirectionalAttack"].GetBool();
+
                 if (doc.HasMember("PowerAttackKey_k") && doc["PowerAttackKey_k"].IsInt())
                     Settings::PowerAttackKey_k = doc["PowerAttackKey_k"].GetInt();
-
                 if (doc.HasMember("PowerAttackKey_m") && doc["PowerAttackKey_m"].IsInt())
                     Settings::PowerAttackKey_m = doc["PowerAttackKey_m"].GetInt();
-
                 if (doc.HasMember("PowerAttackKey_g") && doc["PowerAttackKey_g"].IsInt())
                     Settings::PowerAttackKey_g = doc["PowerAttackKey_g"].GetInt();
 
                 if (doc.HasMember("BlockKey_k") && doc["BlockKey_k"].IsInt())
                     Settings::BlockKey_k = doc["BlockKey_k"].GetInt();
-
                 if (doc.HasMember("BlockKey_m") && doc["BlockKey_m"].IsInt())
                     Settings::BlockKey_m = doc["BlockKey_m"].GetInt();
-
                 if (doc.HasMember("BlockKey_g") && doc["BlockKey_g"].IsInt())
                     Settings::BlockKey_g = doc["BlockKey_g"].GetInt();
+
+                //if (doc.HasMember("AttackKey_k") && doc["AttackKey_k"].IsInt())
+                //    Settings::AttackKey_k = doc["AttackKey_k"].GetInt();
+                //if (doc.HasMember("AttackKey_m") && doc["AttackKey_m"].IsInt())
+                //    Settings::AttackKey_m = doc["AttackKey_m"].GetInt();
+                //if (doc.HasMember("AttackKey_g") && doc["AttackKey_g"].IsInt())
+                //    Settings::AttackKey_g = doc["AttackKey_g"].GetInt();
 
                 /*if (doc.HasMember("bEnableLmbPowerAttack") && doc["bEnableLmbPowerAttack"].IsBool())
                     Settings::bEnableLmbPowerAttack = doc["bEnableLmbPowerAttack"].GetBool();
@@ -258,10 +269,10 @@ namespace BFCOMenu {
             SKSE::log::info("SKSE Menu Framework encontrado. Registrando o menu BFCO.");
 
             // Carrega as configurações do arquivo ao iniciar
-            LoadSettings();
+           
 
             SKSEMenuFramework::SetSection("BFCO");
-            SKSEMenuFramework::AddSectionItem("Config", Render);
+            SKSEMenuFramework::AddSectionItem("Settings", Render);
         } else {
             SKSE::log::warn("SKSE Menu Framework nao encontrado. O menu BFCO nao sera registrado.");
         }

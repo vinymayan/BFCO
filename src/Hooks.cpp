@@ -1,22 +1,21 @@
 #include "Hooks.h"
+
 #include "Settings.h"
 
 // Declaramos as variáveis globais que definimos no main.cpp para que este arquivo saiba que elas existem.
 extern const SKSE::TaskInterface* g_task;
 
-
 const std::string pluginName = "SCSI-ACTbfco-Main.esp";
+const std::string skyrim = "Skyrim.esm";
+const std::string update = "Update.esm";
 
 RE::BGSAction* PowerRight = nullptr;
 RE::BGSAction* PowerStanding = nullptr;
 RE::BGSAction* PowerLeft = nullptr;
 RE::BGSAction* PowerDual = nullptr;
 RE::BGSAction* NormalAttack = nullptr;
-
-constexpr uint32_t MOUSE_BLOCK_BUTTON = 1;  // Botão direito do mouse antes do ajuste (+256)
-constexpr uint32_t MOUSE_ATTACK_BUTTON = 0;
-constexpr uint32_t GAMEPAD_BLOCK_BUTTON = 9;
-constexpr uint32_t GAMEPAD_ATTACK_BUTTON = 10;  // kLeftHand, geralmente Gatilho Esquerdo
+RE::BGSAction* PowerAttack = nullptr;
+RE::BGSAction* Bash = nullptr;
 
 AttackStateManager* AttackStateManager::GetSingleton() {
     static AttackStateManager singleton;
@@ -35,7 +34,6 @@ void AttackStateManager::Register() {
             "FALHA: O gerenciador de input (BSInputDeviceManager) é nulo. O listener não pôde ser registrado.");
     }
 }
-
 
 RE::TESIdleForm* GetIdleByFormID(RE::FormID a_formID, const std::string& a_pluginName) {
     auto* dataHandler = RE::TESDataHandler::GetSingleton();
@@ -59,7 +57,7 @@ void PlayIdleAnimation(RE::Actor* a_actor, RE::TESIdleForm* a_idle) {
             // Como a animação é para o próprio ator, ele será o seu próprio alvo.
             processManager->PlayIdle(a_actor, a_idle, a_actor);
 
-            //SKSE::log::info("Tocando animação idle FormID 0x{:X}", a_idle->GetFormID());
+            // SKSE::log::info("Tocando animação idle FormID 0x{:X}", a_idle->GetFormID());
         } else {
             SKSE::log::error("Não foi possível obter o AIProcess (currentProcess) do ator.");
         }
@@ -108,7 +106,7 @@ RE::BGSAction* GetActionByFormID(RE::FormID a_formID, const std::string& a_plugi
     return lookupForm->As<RE::BGSAction>();
 }
 
-void PerformAction(RE::BGSAction* action,RE::Actor* player) {
+void PerformAction(RE::BGSAction* action, RE::Actor* player) {
     if (action && player) {
         std::unique_ptr<RE::TESActionData> data(RE::TESActionData::Create());
         data->source = RE::NiPointer<RE::TESObjectREFR>(player);
@@ -126,8 +124,8 @@ inline std::array blockedMenus = {
     RE::LockpickingMenu::MENU_NAME, RE::SleepWaitMenu::MENU_NAME,  RE::LevelUpMenu::MENU_NAME,
     RE::Console::MENU_NAME,         RE::BookMenu::MENU_NAME,       RE::CreditsMenu::MENU_NAME,
     RE::LoadingMenu::MENU_NAME,     RE::MessageBoxMenu::MENU_NAME, RE::MainMenu::MENU_NAME,
-    RE::RaceSexMenu::MENU_NAME,     RE::FavoritesMenu::MENU_NAME,  std::string_view("LootMenu"),  
-    std::string_view("LootMenuIE") };
+    RE::RaceSexMenu::MENU_NAME,     RE::FavoritesMenu::MENU_NAME,  std::string_view("LootMenu"),
+    std::string_view("LootMenuIE")};
 
 bool IsAnyMenuOpen() {
     const auto ui = RE::UI::GetSingleton();
@@ -254,6 +252,27 @@ bool IsTryingSprintAttack(RE::Actor* a_actor) {
     auto actorState = a_actor->AsActorState();
     return actorState && actorState->IsSprinting();
 }
+
+void GetAttackKeys() {
+    auto* controlMap = RE::ControlMap::GetSingleton();
+    const auto* userEvents = RE::UserEvents::GetSingleton();
+
+    Settings::AttackKey_k = controlMap->GetMappedKey(userEvents->rightAttack, RE::INPUT_DEVICE::kKeyboard);
+    logger::info("AttackKey_k: {}", Settings::AttackKey_k);
+    Settings::AttackKey_m = controlMap->GetMappedKey(userEvents->rightAttack, RE::INPUT_DEVICE::kMouse);
+    logger::info("AttackKey_m: {}", Settings::AttackKey_m);
+    Settings::AttackKey_m += 256;  // Ajusta o código do mouse para corresponder às configurações
+    Settings::AttackKey_g = controlMap->GetMappedKey(userEvents->rightAttack, RE::INPUT_DEVICE::kGamepad);
+    logger::info("AttackKey_g (before conversion): {}", Settings::AttackKey_g);
+    Settings::AttackKey_g = SKSE::InputMap::GamepadMaskToKeycode(Settings::AttackKey_g);
+    logger::info("AttackKey_g (after conversion): {}", Settings::AttackKey_g);
+
+    // leftAttackKeyKeyboard = controlMap->GetMappedKey(userEvents->leftAttack, RE::INPUT_DEVICE::kKeyboard);
+    // leftAttackKeyMouse = controlMap->GetMappedKey(userEvents->leftAttack, RE::INPUT_DEVICE::kMouse);
+    // leftAttackKeyGamepad = controlMap->GetMappedKey(userEvents->leftAttack, RE::INPUT_DEVICE::kGamepad);
+    // leftAttackKeyGamepad = SKSE::InputMap::GamepadMaskToKeycode(leftAttackKeyGamepad);
+}
+
 RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const* a_event,
                                                           RE::BSTEventSource<RE::InputEvent*>* a_source) {
     if (!a_event || !*a_event) {
@@ -281,27 +300,37 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
         }
 
         if (IsAnyMenuOpen()) {
-        logger::info("menu aberto");
+            // logger::info("menu aberto");
             return RE::BSEventNotifyControl::kContinue;
         }
+        const auto* userEvents = RE::UserEvents::GetSingleton();
 
         auto device = buttonEvent->GetDevice();
         auto keyCode = buttonEvent->GetIDCode();
         // --- INÍCIO DA LÓGICA REORDENADA ---
         const auto playerState = player->AsActorState();
-        auto controlMap = RE::ControlMap::GetSingleton();
-        auto sprintKey = controlMap->GetMappedKey("Sprint", device);
-        auto attackKey = controlMap->GetMappedKey("Block", device);
-        auto blockKey = controlMap->GetMappedKey("Attack", device);
 
-        if (keyCode == sprintKey) {
-            if (buttonEvent->IsDown()) {
-                isPlayerSprinting = true;
-                logger::info("O jogador começou a correr.");
-            }
-        }
+        // if (keyCode == sprintKey) {
+        //     if (buttonEvent->IsDown()) {
+        //         isPlayerSprinting = true;
+        //         //logger::info("O jogador começou a correr.");
+        //     }
+        //     if (buttonEvent->IsUp()) {
+        //         isPlayerSprinting = false;
+        //         // logger::info("O jogador começou a correr.");
+        //     }
+        //     continue;
+        // }
+        // if (keyCode == forwardKey || keyCode == strafeLeftKey || keyCode == backKey || keyCode == strafeRightKey) {
+        //     if (buttonEvent->IsDown()) {
+        //         isPlayerMoving = true;
+        //     }
+        //     if (buttonEvent->IsUp()) {
+        //         isPlayerMoving = false;
+        //     }
+        //     continue;
+        // }
 
-        
         if (!(!player->IsInKillMove() && playerState->GetWeaponState() == RE::WEAPON_STATE::kDrawn &&
               playerState->GetSitSleepState() == RE::SIT_SLEEP_STATE::kNormal &&
               playerState->GetKnockState() == RE::KNOCK_STATE_ENUM::kNormal &&
@@ -318,37 +347,70 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
         RE::BGSPerk* GreatCriticalCharge = GetPerkByEditorID(0xCB406);
         WeaponState currentState = GetPlayerWeaponState(player);
 
-        
-        bool isBlockButtonPressed = (device == RE::INPUT_DEVICE::kMouse && keyCode == blockKey) ||
-                                    (device == RE::INPUT_DEVICE::kGamepad && keyCode == blockKey ||
-                                     device == device == RE::INPUT_DEVICE::kKeyboard && keyCode == blockKey);
-        bool isAttackButtonPressed = (device == RE::INPUT_DEVICE::kMouse && keyCode == attackKey) ||
-                                     (device == RE::INPUT_DEVICE::kGamepad && keyCode == attackKey ||
-                                      device == device == RE::INPUT_DEVICE::kKeyboard && keyCode == attackKey);
-
-
         if (device == RE::INPUT_DEVICE::kMouse) {
             keyCode += 256;  // Ajusta o código do mouse para corresponder às configurações
         }
 
-        if (keyCode == Settings::BlockKey_g || keyCode == Settings::BlockKey_m || keyCode == Settings::BlockKey_k) {
+        bool isBlockButtonPressed = (device == RE::INPUT_DEVICE::kMouse && keyCode == Settings::BlockKey_m) ||
+                                    (device == RE::INPUT_DEVICE::kGamepad && keyCode == Settings::BlockKey_g ||
+                                     device == RE::INPUT_DEVICE::kKeyboard && keyCode == Settings::BlockKey_k);
+        bool isAttackButtonPressed = (device == RE::INPUT_DEVICE::kMouse && keyCode == Settings::AttackKey_m) ||
+                                     (device == RE::INPUT_DEVICE::kGamepad && keyCode == Settings::AttackKey_g ||
+                                      device == RE::INPUT_DEVICE::kKeyboard && keyCode == Settings::AttackKey_k);
+
+        if (isAttackButtonPressed) {
+            if (buttonEvent->IsDown()) {
+                logger::info("aqte aqui ta indo ativado");
+                if (player->IsBlocking()|| isBlocking) {
+                    if (player->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina) <= 0) {
+                        isPlayerSprinting = false;                   // Corrige o estado se a stamina acabar
+                        return RE::BSEventNotifyControl::kContinue;  // Não faz o ataque de sprint
+                    }
+                    player->NotifyAnimationGraph("MCO_EndAnimation");
+                    logger::info("Bash ativado");
+                    if (auto* idleToPlay = GetIdleByFormID(0x8C0, skyrim)) {
+                        PlayIdleAnimation(player, idleToPlay);
+                    }
+                    return RE::BSEventNotifyControl::kStop;
+                }
+            }
+        }
+
+        if (isBlockButtonPressed) {
             if (buttonEvent->IsDown()) {
                 player->NotifyAnimationGraph("blockStart");
                 player->SetGraphVariableBool("IsBlocking", true);
-                return RE::BSEventNotifyControl::kStop;  // Consome o input
+                player->SetGraphVariableInt("BFCO_IsBlocking", 1);
+                isBlocking = true;
             } else if (buttonEvent->IsUp()) {
                 player->SetGraphVariableBool("IsBlocking", false);
                 player->NotifyAnimationGraph("blockStop");
-                return RE::BSEventNotifyControl::kStop;  // Consome o input
+                player->SetGraphVariableInt("BFCO_IsBlocking", 0);
+                isBlocking = false;
+            }
+            return RE::BSEventNotifyControl::kStop;
+        }
+
+        const std::string bfco = "SCSI-ACTbfco-Main.esp";
+        if (Settings::bPowerAttackLMB) {
+            // Mapeia nossas variáveis C++ para os EditorIDs das Globals no .esp
+            std::map<const char*, float> globalsToUpdate = {{"bfcoTG_LmbPowerAttackNUM", 1.0f}};
+
+            for (auto const& [editorID, value] : globalsToUpdate) {
+                RE::TESGlobal* global = RE::TESForm::LookupByEditorID<RE::TESGlobal>(editorID);
+                if (global) {
+                    global->value = value;
+                    // SKSE::log::info("Global '{}' atualizada para o valor: {}", editorID, value);
+                } else {
+                    // SKSE::log::warn("Nao foi possivel encontrar a GlobalVariable: {}", editorID);
+                }
             }
         }
-        '
+
         // 1. VERIFICAR AÇÕES CUSTOMIZADAS PRIMEIRO (APENAS QUANDO O BOTÃO É PRESSIONADO)
         if (buttonEvent->IsDown()) {
             bool powerAttackKeyPressed = false;
             bool comboKeyPressed = false;
-            
-
             if (device == RE::INPUT_DEVICE::kKeyboard) {
                 if (keyCode == Settings::PowerAttackKey_k) powerAttackKeyPressed = true;
                 if (keyCode == Settings::comboKey_k) comboKeyPressed = true;
@@ -360,118 +422,24 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                 if (keyCode == Settings::comboKey_m) comboKeyPressed = true;
             }
 
-            
-
             if (powerAttackKeyPressed) {
-
-                if (Settings::lockSprintAttack && isPlayerSprinting) {
-                    if (player->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina) <= 0) {
-                        isPlayerSprinting = false;             // Corrige o estado se a stamina acabar
-                        return RE::BSEventNotifyControl::kContinue;  // Não faz o ataque de sprint
-                    }
-                        switch (currentState) {
-                            case WeaponState::DualWield:
-                            case WeaponState::OneHanded:
-                            case WeaponState::Invalid:
-                                if (player->HasPerk(CriticalCharge)) {
-                                    player->NotifyAnimationGraph("MCO_EndAnimation");
-                                    if (player->IsMoving()) {
-                                        // Se o jogador estiver se movendo, faz um ataque normal.
-                                        PerformAction(PowerRight, player);
-                                    } else {
-                                        // Se o jogador estiver parado, faz um ataque de poder.
-                                        player->NotifyAnimationGraph("PowerAttack_Start_End");
-                                        if (auto* teste = GetIdleByFormID(0x8C5, pluginName)) {
-                                            PlayIdleAnimation(player, teste);
-                                        }
-                                    }
-                                } else {
-                                    player->NotifyAnimationGraph("MCO_EndAnimation");
-                                    PerformAction(NormalAttack, player);
-                                }
-                                break;
-                            case WeaponState::TwoHanded:
-                                if (player->HasPerk(GreatCriticalCharge)) {
-                                    player->NotifyAnimationGraph("MCO_EndAnimation");
-                                    if (player->IsMoving()) {
-                                        // Se o jogador estiver se movendo, faz um ataque normal.
-                                        PerformAction(PowerDual, player);
-                                    } else {
-                                        // Se o jogador estiver parado, faz um ataque de poder.
-                                        player->NotifyAnimationGraph("PowerAttack_Start_End");
-                                        if (auto* teste = GetIdleByFormID(0x8C5, pluginName)) {
-                                            PlayIdleAnimation(player, teste);
-                                        }
-                                    }
-                                } else {
-                                    player->NotifyAnimationGraph("MCO_EndAnimation");
-                                    PerformAction(NormalAttack, player);
-                                }
-                                break;
-                            default:  // Unarmed ou outros casos
-                                player->NotifyAnimationGraph("MCO_EndAnimation");
-                                if (player->IsMoving()) {
-                                    // Se o jogador estiver se movendo, faz um ataque normal.
-                                    PerformAction(PowerRight, player);
-                                } else {
-                                    // Se o jogador estiver parado, faz um ataque de poder.
-                                    player->NotifyAnimationGraph("PowerAttack_Start_End");
-                                    if (auto* teste = GetIdleByFormID(0x8C5, pluginName)) {
-                                        PlayIdleAnimation(player, teste);
-                                    }
-                                }
-                                break;
-                        
-                        
-                        } 
-                        isPlayerSprinting = false;
-                        return RE::BSEventNotifyControl::kStop;  // Ação executada, consome o input.
-                } else {
-                    switch (currentState) {
-                        case WeaponState::OneHanded:
-                        case WeaponState::Invalid:
-                        case WeaponState::TwoHanded:
-                            player->NotifyAnimationGraph("MCO_EndAnimation");
-                            if (player->IsMoving()) {
-                                // Se o jogador estiver se movendo, faz um ataque normal.
-                                PerformAction(PowerRight, player);
-                            } else {
-                                // Se o jogador estiver parado, faz um ataque de poder.
-                                player->NotifyAnimationGraph("PowerAttack_Start_End");
-                                if (auto* teste = GetIdleByFormID(0x8C5, pluginName)) {
-                                    PlayIdleAnimation(player, teste);
-                                }
-                            }
-                            break;
-                        case WeaponState::DualWield:
-                            player->NotifyAnimationGraph("MCO_EndAnimation");
-                            if (player->IsMoving()) {
-                                // Se o jogador estiver se movendo, faz um ataque normal.
-                                PerformAction(PowerDual, player);
-                            } else {
-                                // Se o jogador estiver parado, faz um ataque de poder.
-                                player->NotifyAnimationGraph("PowerAttack_Start_End");
-                                if (auto* teste = GetIdleByFormID(0x8C5, pluginName)) {
-                                    PlayIdleAnimation(player, teste);
-                                }
-                            }
-                            break;
-                        default:  // Unarmed ou outros casos
-                            player->NotifyAnimationGraph("MCO_EndAnimation");
-                            if (player->IsMoving()) {
-                                // Se o jogador estiver se movendo, faz um ataque normal.
-                                PerformAction(PowerRight, player);
-                            } else {
-                                // Se o jogador estiver parado, faz um ataque de poder.
-                                player->NotifyAnimationGraph("PowerAttack_Start_End");
-                                if (auto* teste = GetIdleByFormID(0x8C5, pluginName)) {
-                                    PlayIdleAnimation(player, teste);
-                                }
-                            }
-                            break;
+                if (player->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina) <= 0) {
+                    isPlayerSprinting = false;                   // Corrige o estado se a stamina acabar
+                    return RE::BSEventNotifyControl::kContinue;  // Não faz o ataque de sprint
+                }
+                if (!Settings::bEnableDirectionalAttack) {
+                    RE::TESGlobal* global = RE::TESForm::LookupByEditorID<RE::TESGlobal>("bfcoTG_DirPowerAttack");
+                    if (global) {
+                        global->value = 0.0f;
+                        // SKSE::log::info("Global '{}' atualizada para o valor: {}", editorID, value);
+                    } else {
+                        // SKSE::log::warn("Nao foi possivel encontrar a GlobalVariable: {}", editorID);
                     }
                 }
-                return RE::BSEventNotifyControl::kStop;  
+                player->NotifyAnimationGraph("MCO_EndAnimation");
+                PerformAction(PowerRight, player);
+
+                return RE::BSEventNotifyControl::kStop;
             }
 
             if (comboKeyPressed) {
@@ -483,216 +451,140 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
 
                 if (Settings::hasCMF) {
                     player->GetGraphVariableBool("BFCO_HasCombo", hasCombo);
-
-                    // --- NOVA LÓGICA ---
-                    // 1. PRIMEIRO, verificar se é um ataque de SPRINT TRAVADO.
-                    if (Settings::lockSprintAttack && isPlayerSprinting) {
-                        // Se for um ataque de sprint E TIVER combo, checa o perk.
-                        if (hasCombo) {
-                            switch (currentState) {
-                                case WeaponState::DualWield:
-                                case WeaponState::OneHanded:
-                                case WeaponState::Invalid:
-                                    if (player->HasPerk(CriticalCharge)) {
-                                        player->NotifyAnimationGraph("MCO_EndAnimation");
-                                        player->NotifyAnimationGraph("BFCOAttackStart_Comb");
-                                        if (auto* idleToPlay = GetIdleByFormID(0x8BF, pluginName)) {
-                                            PlayIdleAnimation(player, idleToPlay);
-                                        }
-                                    } else {
-                                        player->NotifyAnimationGraph("MCO_EndAnimation");
-                                        PerformAction(NormalAttack, player);
-                                    }
-                                    break;
-                                case WeaponState::TwoHanded:
-                                    if (player->HasPerk(GreatCriticalCharge)) {
-                                        player->NotifyAnimationGraph("MCO_EndAnimation");
-                                        player->NotifyAnimationGraph("BFCOAttackStart_Comb");
-                                        if (auto* idleToPlay = GetIdleByFormID(0x8BF, pluginName)) {
-                                            PlayIdleAnimation(player, idleToPlay);
-                                        }
-                                    } else {
-                                        player->NotifyAnimationGraph("MCO_EndAnimation");
-                                        PerformAction(NormalAttack, player);
-                                    }
-                                    break;
-                                default:
-                                    player->NotifyAnimationGraph("MCO_EndAnimation");
-                                    player->NotifyAnimationGraph("BFCOAttackStart_Comb");
-                                    if (auto* idleToPlay = GetIdleByFormID(0x8BF, pluginName)) {
-                                        PlayIdleAnimation(player, idleToPlay);
-                                    }
-                                    break;
-                            }
-                        } else {
-                            // <-- CORREÇÃO PRINCIPAL AQUI
-                            // Se for um ataque de sprint mas NÃO TIVER combo, faz um ataque normal.
-                            player->NotifyAnimationGraph("MCO_EndAnimation");
-                            PerformAction(NormalAttack, player);
-                        }
-
-                        isPlayerSprinting = false;
-                        return RE::BSEventNotifyControl::kStop;
-
-                        // 2. SE NÃO FOR UM ATAQUE DE SPRINT, usa a lógica de combo normal.
-                    } else {
-                        if (hasCombo) {
-                            player->NotifyAnimationGraph("MCO_EndAnimation");
-                            player->NotifyAnimationGraph("BFCOAttackStart_Comb");
-                            if (auto* idleToPlay = GetIdleByFormID(0x8BF, pluginName)) {
-                                PlayIdleAnimation(player, idleToPlay);
-                            }
-                        } else {
-                            // Este é o ataque para quando você está PARADO e sem combo.
-                            player->NotifyAnimationGraph("MCO_EndAnimation");
-                            PerformAction(PowerRight, player);
-                        }
-                        isPlayerSprinting = false;
-                        return RE::BSEventNotifyControl::kStop;
-                    }
-
-                } else {
-                    // A lógica para "sem CMF" já estava correta e não precisa de grandes mudanças.
-                    if (Settings::lockSprintAttack && isPlayerSprinting) {
-                        switch (currentState) {
-                            case WeaponState::DualWield:
-                            case WeaponState::OneHanded:
-                            case WeaponState::Invalid:
-                                if (player->HasPerk(CriticalCharge)) {
-                                    player->NotifyAnimationGraph("MCO_EndAnimation");
-                                    player->NotifyAnimationGraph("BFCOAttackStart_Comb");
-                                    if (auto* idleToPlay = GetIdleByFormID(0x8BF, pluginName)) {
-                                        PlayIdleAnimation(player, idleToPlay);
-                                    }
-                                } else {
-                                    player->NotifyAnimationGraph("MCO_EndAnimation");
-                                    PerformAction(NormalAttack, player);
-                                }
-                                break;
-                            case WeaponState::TwoHanded:
-                                if (player->HasPerk(GreatCriticalCharge)) {
-                                    player->NotifyAnimationGraph("MCO_EndAnimation");
-                                    player->NotifyAnimationGraph("BFCOAttackStart_Comb");
-                                    if (auto* idleToPlay = GetIdleByFormID(0x8BF, pluginName)) {
-                                        PlayIdleAnimation(player, idleToPlay);
-                                    }
-                                } else {
-                                    player->NotifyAnimationGraph("MCO_EndAnimation");
-                                    PerformAction(NormalAttack, player);
-                                }
-                                break;
-                            default:
-                                player->NotifyAnimationGraph("MCO_EndAnimation");
-                                player->NotifyAnimationGraph("BFCOAttackStart_Comb");
-                                if (auto* idleToPlay = GetIdleByFormID(0x8BF, pluginName)) {
-                                    PlayIdleAnimation(player, idleToPlay);
-                                }
-                                break;
-                        }
-                    } else {
+                    if (hasCombo) {
                         player->NotifyAnimationGraph("MCO_EndAnimation");
                         player->NotifyAnimationGraph("BFCOAttackStart_Comb");
                         if (auto* idleToPlay = GetIdleByFormID(0x8BF, pluginName)) {
                             PlayIdleAnimation(player, idleToPlay);
                         }
+                    } else {
+                        // Este é o ataque para quando você está PARADO e sem combo.
+                        player->NotifyAnimationGraph("MCO_EndAnimation");
+                        PerformAction(PowerRight, player);
                     }
+                    return RE::BSEventNotifyControl::kStop;
+                }
+
+                else {
+                    player->NotifyAnimationGraph("MCO_EndAnimation");
+                    player->NotifyAnimationGraph("BFCOAttackStart_Comb");
+                    if (auto* idleToPlay = GetIdleByFormID(0x8BF, pluginName)) {
+                        PlayIdleAnimation(player, idleToPlay);
+                    }
+
                     isPlayerSprinting = false;
                     return RE::BSEventNotifyControl::kStop;
                 }
             }
+            return RE::BSEventNotifyControl::kStop;
         }
 
         // 2. SE O BOTÃO DE BLOQUEIO FOI ACIONADO (MOUSE OU CONTROLE)...
-        if (isBlockButtonPressed && RE::PlayerCamera::GetSingleton()->IsInThirdPerson()) {
-            // --- VERIFICAÇÃO DE ARMA/MAGIA ---
-            bool canBlock = true;
-            auto rightHandItem = player->GetEquippedObject(false);  // false para mão direita
-            auto leftHandItem = player->GetEquippedObject(true);    // true para mão esquerda
+        // if (isBlockButtonPressed && RE::PlayerCamera::GetSingleton()->IsInThirdPerson()) {
+        //    // --- VERIFICAÇÃO DE ARMA/MAGIA ---
+        //    bool canBlock = true;
+        //    auto rightHandItem = player->GetEquippedObject(false);  // false para mão direita
+        //    auto leftHandItem = player->GetEquippedObject(true);    // true para mão esquerda
 
-            // Checa a mão direita
-            if (rightHandItem) {
-                // Se for uma magia...
-                if (rightHandItem->Is(RE::FormType::Spell)) {
-                    canBlock = false;
-                }
-                // Ou se for uma arma do tipo cajado...
-                else if (auto weapon = rightHandItem->As<RE::TESObjectWEAP>(); weapon && weapon->IsStaff()) {
-                    canBlock = false;
-                }
-            }
+        //    // Checa a mão direita
+        //    if (rightHandItem) {
+        //        // Se for uma magia...
+        //        if (rightHandItem->Is(RE::FormType::Spell)) {
+        //            canBlock = false;
+        //        }
+        //        // Ou se for uma arma do tipo cajado...
+        //        else if (auto weapon = rightHandItem->As<RE::TESObjectWEAP>(); weapon && weapon->IsStaff()) {
+        //            canBlock = false;
+        //        }
+        //    }
 
-            // Checa a mão esquerda (só se a direita já não tiver invalidado o bloqueio)
-            if (canBlock && leftHandItem) {
-                // Se for uma magia...
-                if (leftHandItem->Is(RE::FormType::Spell)) {
-                    canBlock = false;
-                }
-                // Ou se for uma arma do tipo cajado...
-                else if (auto weapon = leftHandItem->As<RE::TESObjectWEAP>(); weapon && weapon->IsStaff()) {
-                    canBlock = false;
-                }
-            }
-            // --- FIM DA VERIFICAÇÃO ---
+        //    // Checa a mão esquerda (só se a direita já não tiver invalidado o bloqueio)
+        //    if (canBlock && leftHandItem) {
+        //        // Se for uma magia...
+        //        if (leftHandItem->Is(RE::FormType::Spell)) {
+        //            canBlock = false;
+        //        }
+        //        // Ou se for uma arma do tipo cajado...
+        //        else if (auto weapon = leftHandItem->As<RE::TESObjectWEAP>(); weapon && weapon->IsStaff()) {
+        //            canBlock = false;
+        //        }
+        //    }
+        //    // --- FIM DA VERIFICAÇÃO ---
 
-            // Se, após todas as checagens, o jogador PODE bloquear...
-            if (canBlock) {
-                if (buttonEvent->IsDown()) {
-                    player->NotifyAnimationGraph("blockStart");
-                    player->SetGraphVariableBool("IsBlocking", true);
-                    return RE::BSEventNotifyControl::kStop;  // Consome o input
-                } else if (buttonEvent->IsUp()) {
-                    player->SetGraphVariableBool("IsBlocking", false);
-                    player->NotifyAnimationGraph("blockStop");
-                    return RE::BSEventNotifyControl::kStop;  // Consome o input
+        //    // Se, após todas as checagens, o jogador PODE bloquear...
+        //    if (canBlock) {
+        //        if (buttonEvent->IsDown()) {
+        //            player->NotifyAnimationGraph("blockStart");
+        //            player->SetGraphVariableBool("IsBlocking", true);
+        //            return RE::BSEventNotifyControl::kStop;  // Consome o input
+        //        } else if (buttonEvent->IsUp()) {
+        //            player->SetGraphVariableBool("IsBlocking", false);
+        //            player->NotifyAnimationGraph("blockStop");
+        //            return RE::BSEventNotifyControl::kStop;  // Consome o input
+        //        }
+        //    }
+        //}
+
+        if (Settings::bPowerAttackLMB) {
+            // Mapeia nossas variáveis C++ para os EditorIDs das Globals no .esp
+            std::map<const char*, float> disable = {{"bfcoTG_LmbPowerAttackNUM", 0.0f}};
+
+            for (auto const& [editorID, value] : disable) {
+                RE::TESGlobal* global = RE::TESForm::LookupByEditorID<RE::TESGlobal>(editorID);
+                if (global) {
+                    global->value = value;
+                    // SKSE::log::info("Global '{}' atualizada para o valor: {}", editorID, value);
+                } else {
+                    // SKSE::log::warn("Nao foi possivel encontrar a GlobalVariable: {}", editorID);
                 }
             }
         }
     }
 
-    return RE::BSEventNotifyControl::kContinue;
+    return RE::BSEventNotifyControl::kStop;
 }
 
 //// Processa eventos vindos do motor de animação
-//RE::BSEventNotifyControl AttackStateManager::ProcessEvent(const RE::BSAnimationGraphEvent* a_event,
-//                                                          RE::BSTEventSource<RE::BSAnimationGraphEvent>* a_source) {
-//    if (!a_event || !a_event->holder || !a_event->holder->IsPlayerRef()) {
-//        return RE::BSEventNotifyControl::kContinue;
-//    }
+// RE::BSEventNotifyControl AttackStateManager::ProcessEvent(const RE::BSAnimationGraphEvent* a_event,
+//                                                           RE::BSTEventSource<RE::BSAnimationGraphEvent>* a_source) {
+//     if (!a_event || !a_event->holder || !a_event->holder->IsPlayerRef()) {
+//         return RE::BSEventNotifyControl::kContinue;
+//     }
 //
-//    std::string eventName = a_event->tag.c_str();
+//     std::string eventName = a_event->tag.c_str();
 //
-//    // Eventos que ABREM a janela de combo
-//    if (eventName == "MCO_WinOpen" || eventName == "MCO_PowerWinOpen" || eventName == "BFCO_NextWinStart" ||
-//        eventName == "BFCO_NextPowerWinStart") {
-//        if (!this->inAttackComboWindow) {
-//            SKSE::log::info(">>> LÓGICA: Janela de combo ABERTA pelo evento: {}.", eventName);
-//            this->inAttackComboWindow = true;
-//        }
-//        // Eventos que FECHAM a janela de combo
-//    } else if (eventName == "MCO_WinClose" || eventName == "MCO_PowerWinClose" || eventName == "BFCO_DIY_EndLoop" ||
-//               eventName == "AttackWinEnd" || eventName == "MCO_Recovery" || eventName == "BFCO_DIY_recovery" ||
-//               eventName == "AttackStop") {
-//        if (this->inAttackComboWindow) {
-//            SKSE::log::info(">>> LÓGICA: Janela de combo FECHADA pelo evento: {}.", eventName);
-//            this->inAttackComboWindow = false;
-//        }
-//    }
+//     // Eventos que ABREM a janela de combo
+//     if (eventName == "MCO_WinOpen" || eventName == "MCO_PowerWinOpen" || eventName == "BFCO_NextWinStart" ||
+//         eventName == "BFCO_NextPowerWinStart") {
+//         if (!this->inAttackComboWindow) {
+//             SKSE::log::info(">>> LÓGICA: Janela de combo ABERTA pelo evento: {}.", eventName);
+//             this->inAttackComboWindow = true;
+//         }
+//         // Eventos que FECHAM a janela de combo
+//     } else if (eventName == "MCO_WinClose" || eventName == "MCO_PowerWinClose" || eventName == "BFCO_DIY_EndLoop" ||
+//                eventName == "AttackWinEnd" || eventName == "MCO_Recovery" || eventName == "BFCO_DIY_recovery" ||
+//                eventName == "AttackStop") {
+//         if (this->inAttackComboWindow) {
+//             SKSE::log::info(">>> LÓGICA: Janela de combo FECHADA pelo evento: {}.", eventName);
+//             this->inAttackComboWindow = false;
+//         }
+//     }
 //
-//    return RE::BSEventNotifyControl::kContinue;
-//}
+//     return RE::BSEventNotifyControl::kContinue;
+// }
 //
-//bool AttackStateManager::HasEnoughStamina(RE::PlayerCharacter* player) {
-//    // Podemos começar com um valor fixo para testar. 30 é um custo razoável para um power attack.
-//    float requiredStamina = 30.0f;
+// bool AttackStateManager::HasEnoughStamina(RE::PlayerCharacter* player) {
+//     // Podemos começar com um valor fixo para testar. 30 é um custo razoável para um power attack.
+//     float requiredStamina = 30.0f;
 //
-//    float currentStamina = player->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina);
+//     float currentStamina = player->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina);
 //
-//    if (currentStamina >= requiredStamina) {
-//        return true;
-//    } else {
-//        SKSE::log::warn("--- VERIFICAÇÃO FALHOU: Vigor insuficiente. Necessário: {}, Atual: {}", requiredStamina,
-//                        currentStamina);
-//        // Opcional: Adicionar um som de "falha" ou efeito visual aqui, como piscar a barra de vigor.
-//        return false;
-//    }
-//}
+//     if (currentStamina >= requiredStamina) {
+//         return true;
+//     } else {
+//         SKSE::log::warn("--- VERIFICAÇÃO FALHOU: Vigor insuficiente. Necessário: {}, Atual: {}", requiredStamina,
+//                         currentStamina);
+//         // Opcional: Adicionar um som de "falha" ou efeito visual aqui, como piscar a barra de vigor.
+//         return false;
+//     }
+// }

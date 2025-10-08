@@ -20,15 +20,19 @@ void OnSKSEMessage(SKSE::MessagingInterface::Message* msg) {
             PowerLeft = RE::TESForm::LookupByID<RE::BGSAction>(0x2E2F6);
             PowerDual = RE::TESForm::LookupByID<RE::BGSAction>(0x2E2F7);
             NormalAttack = RE::TESForm::LookupByID<RE::BGSAction>(0x13005);
+            PowerAttack = RE::TESForm::LookupByID<RE::BGSAction>(0xE8456);
+            Bash = RE::TESForm::LookupByID<RE::BGSAction>(0x1B417);
+            BFCOMenu::LoadSettings();
             BFCOMenu::Register();
-            BFCOMenu::UpdateGameGlobals();
             break;
         }
         case SKSE::MessagingInterface::kPostLoadGame:
-            
+            BFCOMenu::UpdateGameGlobals();
+            GetAttackKeys();
             break;
         case SKSE::MessagingInterface::kNewGame: {
             BFCOMenu::UpdateGameGlobals();
+            GetAttackKeys();
             break;
         }
     }

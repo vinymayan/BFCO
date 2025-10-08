@@ -18,7 +18,10 @@ private:
 
     bool inAttackComboWindow = false;
     bool isAttacking = false;
+    bool isBlocking = false;
     bool isPlayerSprinting = false;
+    bool isPlayerMoving = false;
+
 };
 
 enum class WeaponState {
@@ -34,4 +37,9 @@ extern RE::BGSAction* PowerStanding;
 extern RE::BGSAction* PowerLeft;
 extern RE::BGSAction* PowerDual;
 extern RE::BGSAction* NormalAttack;
+extern RE::BGSAction* PowerAttack;
+extern RE::BGSAction* Bash;
+
+void GetAttackKeys();
+inline bool isBlocking = false;
 
