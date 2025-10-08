@@ -340,13 +340,6 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
             return RE::BSEventNotifyControl::kContinue;
         }
 
-        const std::string perk1 = "Critical Charge";
-        const std::string perk2 = "Great Critical Charge";
-
-        RE::BGSPerk* CriticalCharge = GetPerkByEditorID(0x58F62);
-        RE::BGSPerk* GreatCriticalCharge = GetPerkByEditorID(0xCB406);
-        WeaponState currentState = GetPlayerWeaponState(player);
-
         if (device == RE::INPUT_DEVICE::kMouse) {
             keyCode += 256;  // Ajusta o código do mouse para corresponder às configurações
         }
@@ -360,20 +353,26 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
 
         if (isAttackButtonPressed) {
             if (buttonEvent->IsDown()) {
-                logger::info("aqte aqui ta indo ativado");
-                if (player->IsBlocking()|| isBlocking) {
+                // logger::info("aqte aqui ta indo ativado");
+                RE::TESGlobal* global = RE::TESForm::LookupByEditorID<RE::TESGlobal>("BFCO_NormalAttackIsOK");
+                if (global) {
+                    global->value = 1.0f;
+                }
+                if (isBlocking || player->IsBlocking()) {
                     if (player->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina) <= 0) {
                         isPlayerSprinting = false;                   // Corrige o estado se a stamina acabar
                         return RE::BSEventNotifyControl::kContinue;  // Não faz o ataque de sprint
                     }
                     player->NotifyAnimationGraph("MCO_EndAnimation");
                     logger::info("Bash ativado");
-                    if (auto* idleToPlay = GetIdleByFormID(0x8C0, skyrim)) {
+                    if (auto* idleToPlay = GetIdleByFormID(0x8C0, pluginName)) {
                         PlayIdleAnimation(player, idleToPlay);
                     }
                     return RE::BSEventNotifyControl::kStop;
                 }
+                return RE::BSEventNotifyControl::kStop;
             }
+            return RE::BSEventNotifyControl::kContinue;
         }
 
         if (isBlockButtonPressed) {
@@ -393,10 +392,16 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
 
         const std::string bfco = "SCSI-ACTbfco-Main.esp";
         if (Settings::bPowerAttackLMB) {
-            // Mapeia nossas variáveis C++ para os EditorIDs das Globals no .esp
-            std::map<const char*, float> globalsToUpdate = {{"bfcoTG_LmbPowerAttackNUM", 1.0f}};
+                RE::TESGlobal* global = RE::TESForm::LookupByEditorID<RE::TESGlobal>("bfcoTG_LmbPowerAttackNUM");
+                if (global) {
+                    global->value = 1.0f;
+                }
+            
+        }
+        if (Settings::PowerAttackKey_m == 257) {
+            std::map<const char*, float> powerRMB = {{"bfcoTG_RmbPowerAttackNUM", 1.0f}};
 
-            for (auto const& [editorID, value] : globalsToUpdate) {
+            for (auto const& [editorID, value] : powerRMB) {
                 RE::TESGlobal* global = RE::TESForm::LookupByEditorID<RE::TESGlobal>(editorID);
                 if (global) {
                     global->value = value;
@@ -405,8 +410,8 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                     // SKSE::log::warn("Nao foi possivel encontrar a GlobalVariable: {}", editorID);
                 }
             }
-        }
 
+        }
         // 1. VERIFICAR AÇÕES CUSTOMIZADAS PRIMEIRO (APENAS QUANDO O BOTÃO É PRESSIONADO)
         if (buttonEvent->IsDown()) {
             bool powerAttackKeyPressed = false;
@@ -421,6 +426,8 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                 if (keyCode == Settings::PowerAttackKey_m) powerAttackKeyPressed = true;
                 if (keyCode == Settings::comboKey_m) comboKeyPressed = true;
             }
+
+            
 
             if (powerAttackKeyPressed) {
                 if (player->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina) <= 0) {
@@ -525,23 +532,23 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
         //    }
         //}
 
-        if (Settings::bPowerAttackLMB) {
-            // Mapeia nossas variáveis C++ para os EditorIDs das Globals no .esp
-            std::map<const char*, float> disable = {{"bfcoTG_LmbPowerAttackNUM", 0.0f}};
+        //if (Settings::bPowerAttackLMB) {
+        //    // Mapeia nossas variáveis C++ para os EditorIDs das Globals no .esp
+        //    std::map<const char*, float> disable = {{"bfcoTG_LmbPowerAttackNUM", 0.0f}};
 
-            for (auto const& [editorID, value] : disable) {
-                RE::TESGlobal* global = RE::TESForm::LookupByEditorID<RE::TESGlobal>(editorID);
-                if (global) {
-                    global->value = value;
-                    // SKSE::log::info("Global '{}' atualizada para o valor: {}", editorID, value);
-                } else {
-                    // SKSE::log::warn("Nao foi possivel encontrar a GlobalVariable: {}", editorID);
-                }
-            }
-        }
+        //    for (auto const& [editorID, value] : disable) {
+        //        RE::TESGlobal* global = RE::TESForm::LookupByEditorID<RE::TESGlobal>(editorID);
+        //        if (global) {
+        //            global->value = value;
+        //            // SKSE::log::info("Global '{}' atualizada para o valor: {}", editorID, value);
+        //        } else {
+        //            // SKSE::log::warn("Nao foi possivel encontrar a GlobalVariable: {}", editorID);
+        //        }
+        //    }
+        //}
     }
 
-    return RE::BSEventNotifyControl::kStop;
+    return RE::BSEventNotifyControl::kContinue;
 }
 
 //// Processa eventos vindos do motor de animação
