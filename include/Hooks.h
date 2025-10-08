@@ -2,17 +2,26 @@
 #include "RE/B/BSTEvent.h"
 #include "ClibUtil/singleton.hpp"
 
-class AttackStateManager : public RE::BSTEventSink<RE::InputEvent*>  // TIPO 1: Note o ponteiro em RE::InputEvent*
+
+
+class AttackStateManager
+    : public RE::BSTEventSink<RE::InputEvent*>,
+      public RE::BSTEventSink<RE::BSAnimationGraphEvent>  // TIPO 1: Note o ponteiro em RE::InputEvent*
                             {  // TIPO 2: Sem ponteiro aqui
 public:
-    static AttackStateManager* GetSingleton();
+
+    static AttackStateManager* GetSingleton() {
+        static AttackStateManager singleton;
+        return &singleton;
+    }
     void Register();
 
     // Assinatura CORRETA para RE::InputEvent*
     RE::BSEventNotifyControl ProcessEvent(RE::InputEvent* const* a_event,
                                           RE::BSTEventSource<RE::InputEvent*>* a_source) override;
 
-
+    RE::BSEventNotifyControl ProcessEvent(const RE::BSAnimationGraphEvent* a_event,
+                                          RE::BSTEventSource<RE::BSAnimationGraphEvent>* a_source) override;
 
 private:
 

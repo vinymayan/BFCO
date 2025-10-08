@@ -17,10 +17,7 @@ RE::BGSAction* NormalAttack = nullptr;
 RE::BGSAction* PowerAttack = nullptr;
 RE::BGSAction* Bash = nullptr;
 
-AttackStateManager* AttackStateManager::GetSingleton() {
-    static AttackStateManager singleton;
-    return &singleton;
-}
+
 
 void AttackStateManager::Register() {
     SKSE::log::info("Tentando registrar listener de input...");
@@ -33,6 +30,12 @@ void AttackStateManager::Register() {
         SKSE::log::error(
             "FALHA: O gerenciador de input (BSInputDeviceManager) é nulo. O listener não pôde ser registrado.");
     }
+    auto* animationEventSource = RE::PlayerCharacter::GetSingleton();
+    if (animationEventSource) {
+        animationEventSource->AddAnimationGraphEventSink(this);
+        SKSE::log::info("AnimationEventHandler registrado com sucesso.");
+    }
+
 }
 
 RE::TESIdleForm* GetIdleByFormID(RE::FormID a_formID, const std::string& a_pluginName) {
@@ -264,8 +267,7 @@ void GetAttackKeys() {
     Settings::AttackKey_m += 256;  // Ajusta o código do mouse para corresponder às configurações
     Settings::AttackKey_g = controlMap->GetMappedKey(userEvents->rightAttack, RE::INPUT_DEVICE::kGamepad);
     logger::info("AttackKey_g (before conversion): {}", Settings::AttackKey_g);
-    Settings::AttackKey_g = SKSE::InputMap::GamepadMaskToKeycode(Settings::AttackKey_g);
-    logger::info("AttackKey_g (after conversion): {}", Settings::AttackKey_g);
+
 
     // leftAttackKeyKeyboard = controlMap->GetMappedKey(userEvents->leftAttack, RE::INPUT_DEVICE::kKeyboard);
     // leftAttackKeyMouse = controlMap->GetMappedKey(userEvents->leftAttack, RE::INPUT_DEVICE::kMouse);
@@ -310,6 +312,28 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
         // --- INÍCIO DA LÓGICA REORDENADA ---
         const auto playerState = player->AsActorState();
 
+        std::string deviceName;
+        switch (device) {
+            case RE::INPUT_DEVICE::kKeyboard:
+                deviceName = "Keyboard";
+                break;
+            case RE::INPUT_DEVICE::kMouse:
+                deviceName = "Mouse";
+                break;
+            case RE::INPUT_DEVICE::kGamepad:
+                deviceName = "Gamepad";
+                break;
+            default:
+                deviceName = "Unknown Device";
+                break;
+        }
+
+        // Determina a ação (pressionado ou solto)
+        std::string action = buttonEvent->IsDown() ? "Pressed" : "Released";
+
+        // Imprime a informação formatada no log do SKSE
+        SKSE::log::info("Input Event -> Device: {}, KeyCode: {}, Action: {}", deviceName, keyCode, action);
+
         // if (keyCode == sprintKey) {
         //     if (buttonEvent->IsDown()) {
         //         isPlayerSprinting = true;
@@ -350,14 +374,16 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
         bool isAttackButtonPressed = (device == RE::INPUT_DEVICE::kMouse && keyCode == Settings::AttackKey_m) ||
                                      (device == RE::INPUT_DEVICE::kGamepad && keyCode == Settings::AttackKey_g ||
                                       device == RE::INPUT_DEVICE::kKeyboard && keyCode == Settings::AttackKey_k);
-
+        RE::TESGlobal* power = RE::TESForm::LookupByEditorID<RE::TESGlobal>("BFCO_StrongAttackIsOK");
+        RE::TESGlobal* normal = RE::TESForm::LookupByEditorID<RE::TESGlobal>("BFCO_NormalAttackIsOK");
         if (isAttackButtonPressed) {
-            RE::TESGlobal* normal = RE::TESForm::LookupByEditorID<RE::TESGlobal>("BFCO_NormalAttackIsOK");
+            
             if (buttonEvent->IsDown()) {
                 // logger::info("aqte aqui ta indo ativado");
                 if (normal) {
                     normal->value = 1.0f;
                 }
+
                 if (isBlocking || player->IsBlocking()) {
                     if (player->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina) <= 0) {
                         isPlayerSprinting = false;                   // Corrige o estado se a stamina acabar
@@ -370,7 +396,8 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                     }
                 }
             }
-            return RE::BSEventNotifyControl::kContinue;
+
+            return RE::BSEventNotifyControl::kStop;
         }
 
         if (isBlockButtonPressed) {
@@ -425,7 +452,6 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                 if (keyCode == Settings::comboKey_m) comboKeyPressed = true;
             }
 
-            RE::TESGlobal* power = RE::TESForm::LookupByEditorID<RE::TESGlobal>("BFCO_StrongAttackIsOK");
 
             if (powerAttackKeyPressed) {
                 
@@ -450,7 +476,6 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                 player->NotifyAnimationGraph("MCO_EndAnimation");
                 PerformAction(PowerRight, player);
                 return RE::BSEventNotifyControl::kStop;
-
             }
             if (comboKeyPressed) {
                 bool hasCombo = false;
@@ -486,18 +511,8 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                     return RE::BSEventNotifyControl::kStop;
                 }
             }
-            return RE::BSEventNotifyControl::kStop;
         }
-        if (buttonEvent->IsUp()) {
-            RE::TESGlobal* power = RE::TESForm::LookupByEditorID<RE::TESGlobal>("BFCO_StrongAttackIsOK");
-            if (power) {
-                power->value = 0.0f;
-            }
-            RE::TESGlobal* normal = RE::TESForm::LookupByEditorID<RE::TESGlobal>("BFCO_NormalAttackIsOK");
-            if (normal) {
-                normal->value = 0.0f;
-            }
-        }
+
 
         // 2. SE O BOTÃO DE BLOQUEIO FOI ACIONADO (MOUSE OU CONTROLE)...
         // if (isBlockButtonPressed && RE::PlayerCamera::GetSingleton()->IsInThirdPerson()) {
@@ -564,47 +579,34 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
     return RE::BSEventNotifyControl::kContinue;
 }
 
-//// Processa eventos vindos do motor de animação
-// RE::BSEventNotifyControl AttackStateManager::ProcessEvent(const RE::BSAnimationGraphEvent* a_event,
-//                                                           RE::BSTEventSource<RE::BSAnimationGraphEvent>* a_source) {
-//     if (!a_event || !a_event->holder || !a_event->holder->IsPlayerRef()) {
-//         return RE::BSEventNotifyControl::kContinue;
-//     }
-//
-//     std::string eventName = a_event->tag.c_str();
-//
-//     // Eventos que ABREM a janela de combo
-//     if (eventName == "MCO_WinOpen" || eventName == "MCO_PowerWinOpen" || eventName == "BFCO_NextWinStart" ||
-//         eventName == "BFCO_NextPowerWinStart") {
-//         if (!this->inAttackComboWindow) {
-//             SKSE::log::info(">>> LÓGICA: Janela de combo ABERTA pelo evento: {}.", eventName);
-//             this->inAttackComboWindow = true;
-//         }
-//         // Eventos que FECHAM a janela de combo
-//     } else if (eventName == "MCO_WinClose" || eventName == "MCO_PowerWinClose" || eventName == "BFCO_DIY_EndLoop" ||
-//                eventName == "AttackWinEnd" || eventName == "MCO_Recovery" || eventName == "BFCO_DIY_recovery" ||
-//                eventName == "AttackStop") {
-//         if (this->inAttackComboWindow) {
-//             SKSE::log::info(">>> LÓGICA: Janela de combo FECHADA pelo evento: {}.", eventName);
-//             this->inAttackComboWindow = false;
-//         }
-//     }
-//
-//     return RE::BSEventNotifyControl::kContinue;
-// }
-//
-// bool AttackStateManager::HasEnoughStamina(RE::PlayerCharacter* player) {
-//     // Podemos começar com um valor fixo para testar. 30 é um custo razoável para um power attack.
-//     float requiredStamina = 30.0f;
-//
-//     float currentStamina = player->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina);
-//
-//     if (currentStamina >= requiredStamina) {
-//         return true;
-//     } else {
-//         SKSE::log::warn("--- VERIFICAÇÃO FALHOU: Vigor insuficiente. Necessário: {}, Atual: {}", requiredStamina,
-//                         currentStamina);
-//         // Opcional: Adicionar um som de "falha" ou efeito visual aqui, como piscar a barra de vigor.
-//         return false;
-//     }
-// }
+// Processa eventos vindos do motor de animação
+ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(const RE::BSAnimationGraphEvent* a_event,
+                                                           RE::BSTEventSource<RE::BSAnimationGraphEvent>* a_source) {
+     if (!a_event || !a_event->holder) {
+         return RE::BSEventNotifyControl::kContinue;
+     }
+
+     std::string eventName = a_event->tag.c_str();
+     RE::TESGlobal* powerAtt = RE::TESForm::LookupByEditorID<RE::TESGlobal>("BFCO_StrongAttackIsOK");
+     RE::TESGlobal* normalAtt = RE::TESForm::LookupByEditorID<RE::TESGlobal>("BFCO_NormalAttackIsOK");
+
+     // Compara a tag do evento com as que você quer manipular
+     // Use _stricmp para uma comparação sem diferenciar maiúsculas/minúsculas
+     if (_stricmp(eventName.c_str(), "Bfco_AttackStartFX") == 0) {
+         SKSE::log::info("Evento de animação 'Bfco_AttackStartFX' recebido!");
+         if (normalAtt) {
+             normalAtt->value = 0.0f;
+         }
+         if (powerAtt) {
+             powerAtt->value = 0.0f;
+         }
+
+     } else if (_stricmp(eventName.c_str(), "HitFrame") == 0) {
+         SKSE::log::info("Evento de animação 'HitFrame' recebido!");
+         // Coloque sua lógica aqui
+     }
+
+     return RE::BSEventNotifyControl::kContinue;
+ }
+
+
