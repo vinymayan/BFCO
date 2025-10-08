@@ -136,8 +136,8 @@ namespace BFCOMenu {
         std::map<const char*, float> globalsToUpdate = {
             {"bfcoTG_KeyAttackComb", Settings::bEnableComboAttack ? 1.0f : 0.0f},
             {"bfcoDebug_DisJumpAttack", Settings::bDisableJumpingAttack ? 1.0f : 0.0f},
-            {"BFCO_StrongAttackIsOK", 1.0f },
-            {"BFCO_NormalAttackIsOK", 1.0f },
+            //{"BFCO_StrongAttackIsOK", 1.0f },
+            //{"BFCO_NormalAttackIsOK", 1.0f },
             //{"BFCO_Global_ComboKey",static_cast<float>(Settings::comboKey_k)},  // Supondo que o script use o valor do teclado
             {"bfcoTG_DirPowerAttack", Settings::bEnableDirectionalAttack ? 1.0f : 0.0f},
             // Adicione outras Globals aqui conforme o MCM original

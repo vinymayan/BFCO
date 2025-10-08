@@ -352,11 +352,11 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                                       device == RE::INPUT_DEVICE::kKeyboard && keyCode == Settings::AttackKey_k);
 
         if (isAttackButtonPressed) {
+            RE::TESGlobal* normal = RE::TESForm::LookupByEditorID<RE::TESGlobal>("BFCO_NormalAttackIsOK");
             if (buttonEvent->IsDown()) {
                 // logger::info("aqte aqui ta indo ativado");
-                RE::TESGlobal* global = RE::TESForm::LookupByEditorID<RE::TESGlobal>("BFCO_NormalAttackIsOK");
-                if (global) {
-                    global->value = 1.0f;
+                if (normal) {
+                    normal->value = 1.0f;
                 }
                 if (isBlocking || player->IsBlocking()) {
                     if (player->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina) <= 0) {
@@ -368,9 +368,7 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                     if (auto* idleToPlay = GetIdleByFormID(0x8C0, pluginName)) {
                         PlayIdleAnimation(player, idleToPlay);
                     }
-                    return RE::BSEventNotifyControl::kStop;
                 }
-                return RE::BSEventNotifyControl::kStop;
             }
             return RE::BSEventNotifyControl::kContinue;
         }
@@ -390,11 +388,11 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
             return RE::BSEventNotifyControl::kStop;
         }
 
-        const std::string bfco = "SCSI-ACTbfco-Main.esp";
+
         if (Settings::bPowerAttackLMB) {
-                RE::TESGlobal* global = RE::TESForm::LookupByEditorID<RE::TESGlobal>("bfcoTG_LmbPowerAttackNUM");
-                if (global) {
-                    global->value = 1.0f;
+                RE::TESGlobal* powerLMB = RE::TESForm::LookupByEditorID<RE::TESGlobal>("bfcoTG_LmbPowerAttackNUM");
+                if (powerLMB) {
+                    powerLMB->value = 1.0f;
                 }
             
         }
@@ -427,28 +425,33 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                 if (keyCode == Settings::comboKey_m) comboKeyPressed = true;
             }
 
-            
+            RE::TESGlobal* power = RE::TESForm::LookupByEditorID<RE::TESGlobal>("BFCO_StrongAttackIsOK");
 
             if (powerAttackKeyPressed) {
+                
+                if (power) {
+                    power->value = 1.0f;
+                }
                 if (player->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina) <= 0) {
                     isPlayerSprinting = false;                   // Corrige o estado se a stamina acabar
                     return RE::BSEventNotifyControl::kContinue;  // Não faz o ataque de sprint
                 }
+                
                 if (!Settings::bEnableDirectionalAttack) {
-                    RE::TESGlobal* global = RE::TESForm::LookupByEditorID<RE::TESGlobal>("bfcoTG_DirPowerAttack");
-                    if (global) {
-                        global->value = 0.0f;
+                    RE::TESGlobal* direct = RE::TESForm::LookupByEditorID<RE::TESGlobal>("bfcoTG_DirPowerAttack");
+                    if (direct) {
+                        direct->value = 0.0f;
                         // SKSE::log::info("Global '{}' atualizada para o valor: {}", editorID, value);
                     } else {
                         // SKSE::log::warn("Nao foi possivel encontrar a GlobalVariable: {}", editorID);
                     }
                 }
+
                 player->NotifyAnimationGraph("MCO_EndAnimation");
                 PerformAction(PowerRight, player);
-
                 return RE::BSEventNotifyControl::kStop;
-            }
 
+            }
             if (comboKeyPressed) {
                 bool hasCombo = false;
                 if (player->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina) <= 0) {
@@ -484,6 +487,16 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                 }
             }
             return RE::BSEventNotifyControl::kStop;
+        }
+        if (buttonEvent->IsUp()) {
+            RE::TESGlobal* power = RE::TESForm::LookupByEditorID<RE::TESGlobal>("BFCO_StrongAttackIsOK");
+            if (power) {
+                power->value = 0.0f;
+            }
+            RE::TESGlobal* normal = RE::TESForm::LookupByEditorID<RE::TESGlobal>("BFCO_NormalAttackIsOK");
+            if (normal) {
+                normal->value = 0.0f;
+            }
         }
 
         // 2. SE O BOTÃO DE BLOQUEIO FOI ACIONADO (MOUSE OU CONTROLE)...
