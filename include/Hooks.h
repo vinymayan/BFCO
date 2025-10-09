@@ -1,13 +1,26 @@
 #pragma once
 #include "RE/B/BSTEvent.h"
 #include "ClibUtil/singleton.hpp"
+#include "RE/Skyrim.h"
+#include "SKSE/SKSE.h"
+#include <Windows.h>
+#include <map>
+#include <string>
 
+class AnimationEventHandler : public RE::BSTEventSink<RE::BSAnimationGraphEvent> {
+public:
+    static AnimationEventHandler* GetSingleton() {
+        static AnimationEventHandler singleton;
+        return &singleton;
+    }
+
+    RE::BSEventNotifyControl ProcessEvent(const RE::BSAnimationGraphEvent* a_event,
+                                          RE::BSTEventSource<RE::BSAnimationGraphEvent>*) override;
+};
 
 
 class AttackStateManager
-    : public RE::BSTEventSink<RE::InputEvent*>,
-      public RE::BSTEventSink<RE::BSAnimationGraphEvent>  // TIPO 1: Note o ponteiro em RE::InputEvent*
-                            {  // TIPO 2: Sem ponteiro aqui
+    : public RE::BSTEventSink<RE::InputEvent*> {  // TIPO 2: Sem ponteiro aqui
 public:
 
     static AttackStateManager* GetSingleton() {
@@ -20,16 +33,29 @@ public:
     RE::BSEventNotifyControl ProcessEvent(RE::InputEvent* const* a_event,
                                           RE::BSTEventSource<RE::InputEvent*>* a_source) override;
 
-    RE::BSEventNotifyControl ProcessEvent(const RE::BSAnimationGraphEvent* a_event,
-                                          RE::BSTEventSource<RE::BSAnimationGraphEvent>* a_source) override;
 
 private:
 
     bool inAttackComboWindow = false;
     bool isAttacking = false;
-    bool isBlocking = false;
     bool isPlayerSprinting = false;
     bool isPlayerMoving = false;
+    bool isBlocking = false;
+    bool _isCurrentlyBlocking = false;
+    enum class AttackButtonState {
+        kNone,
+        kPressed,
+        kHeld,
+        kPowerAttackReleased_ComboWindowOpen  // NOVO ESTADO!
+    };
+
+    AttackButtonState _attackState = AttackButtonState::kNone;
+    std::chrono::steady_clock::time_point _attackPressTime;
+    std::chrono::steady_clock::time_point _comboWindowExpireTime;  // NOVO CRONÔMETRO!
+
+    const std::chrono::milliseconds _powerAttackThreshold{200};
+    const std::chrono::milliseconds _comboWindowDuration{1000};
+    void OpenComboWindow();
 
 };
 
@@ -50,5 +76,5 @@ extern RE::BGSAction* PowerAttack;
 extern RE::BGSAction* Bash;
 
 void GetAttackKeys();
-inline bool isBlocking = false;
+
 

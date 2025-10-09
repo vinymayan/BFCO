@@ -9,7 +9,7 @@ const SKSE::TaskInterface* g_task = nullptr;
 // ------------------------------------
 
 // MUDANÇA: A função foi renomeada para refletir que lida com várias mensagens.
-void OnSKSEMessage(SKSE::MessagingInterface::Message* msg) {
+void OnMessage(SKSE::MessagingInterface::Message* msg) {
     switch (msg->type) {
         case SKSE::MessagingInterface::kDataLoaded: {
             IsCycleMovesetActive();
@@ -24,11 +24,21 @@ void OnSKSEMessage(SKSE::MessagingInterface::Message* msg) {
             Bash = RE::TESForm::LookupByID<RE::BGSAction>(0x1B417);
             BFCOMenu::LoadSettings();
             BFCOMenu::Register();
+            SKSE::log::info("Tentando registrar AnimationEventHandler...");
+            auto* animationEventSource = RE::PlayerCharacter::GetSingleton();
+            if (animationEventSource) {
+                animationEventSource->AddAnimationGraphEventSink(AnimationEventHandler::GetSingleton());
+                SKSE::log::info("AnimationEventHandler registrado com sucesso no PlayerCharacter.");
+            } else {
+                SKSE::log::error(
+                    "Falha ao registrar AnimationEventHandler: PlayerCharacter não encontrado durante kDataLoaded.");
+            }
             break;
         }
         case SKSE::MessagingInterface::kPostLoadGame:
             BFCOMenu::UpdateGameGlobals();
             GetAttackKeys();
+
             break;
         case SKSE::MessagingInterface::kNewGame: {
             BFCOMenu::UpdateGameGlobals();
@@ -46,15 +56,7 @@ SKSEPluginLoad(const SKSE::LoadInterface* skse) {
     if (!g_task) {
         SKSE::log::critical("Não foi possível obter a Task Interface do SKSE.");
     }
-
-    auto message = SKSE::GetMessagingInterface();
-    if (message) {
-        // MUDANÇA: Precisamos escutar pelo evento kDataLoaded também.
-        message->RegisterListener("SKSE", OnSKSEMessage);
-        SKSE::log::info("Listener de mensagens SKSE registrado com sucesso.");
-    } else {
-        SKSE::log::critical("Não foi possível obter a interface de mensagens do SKSE.");
-    }
+    SKSE::GetMessagingInterface()->RegisterListener(OnMessage);
 
     return true;
 }

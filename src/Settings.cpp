@@ -12,7 +12,7 @@ namespace BFCOMenu {
 
     // Função auxiliar para criar um seletor de teclas (ComboBox)
     // Baseado no seu exemplo Events.cpp
-    void RenderKeybind(const char* label, uint32_t* key_k, uint32_t* key_m, uint32_t* key_g) {
+    void RenderKeybind(const char* label, uint32_t* key_k, uint32_t* key_m, uint32_t* key_g, bool mouse_only = false) {
         bool settings_changed = false;
 
         // --- DROPDOWN UNIFICADO PARA TECLADO E MOUSE ---
@@ -33,6 +33,7 @@ namespace BFCOMenu {
         if (ImGui::BeginCombo((std::string("##_pc_") + label).c_str(), current_key_name_pc)) {
             // Itera por TODAS as teclas (teclado e mouse) no mapa.
             for (auto const& [key_code, key_name] : g_dx_to_name_map) {
+                if (mouse_only && key_code < 256) continue;
                 const bool is_selected = (current_pc_key == key_code);
                 if (ImGui::Selectable(key_name, is_selected)) {
                     // 4. LÓGICA DE EXCLUSÃO MÚTUA
@@ -105,7 +106,7 @@ namespace BFCOMenu {
         ImGui::Spacing();
 
 
-        RenderKeybind("Block Key (Beta)", &Settings::BlockKey_k, &Settings::BlockKey_m, &Settings::BlockKey_g);
+        RenderKeybind("Block Key (Beta)", &Settings::BlockKey_k, &Settings::BlockKey_m, &Settings::BlockKey_g, true);
 
         ImGui::Spacing();
         ImGui::Separator();
@@ -141,7 +142,8 @@ namespace BFCOMenu {
             //{"BFCO_Global_ComboKey",static_cast<float>(Settings::comboKey_k)},  // Supondo que o script use o valor do teclado
             {"bfcoTG_DirPowerAttack", Settings::bEnableDirectionalAttack ? 1.0f : 0.0f},
             // Adicione outras Globals aqui conforme o MCM original
-            {"bfcoTG_LmbPowerAttackNUM", Settings::bPowerAttackLMB ? 0.0f : 1.0f}
+            {"bfcoTG_LmbPowerAttackNUM", Settings::bPowerAttackLMB ? 0.0f : 1.0f},
+            {"bfcoTG_RmbPowerAttackNUM", Settings::PowerAttackKey_m == 257 ? 1.0f : 0.0f}
         };
 
         for (auto const& [editorID, value] : globalsToUpdate) {
