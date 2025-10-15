@@ -10,8 +10,7 @@ const SKSE::TaskInterface* g_task = nullptr;
 
 // MUDANÇA: A função foi renomeada para refletir que lida com várias mensagens.
 void OnMessage(SKSE::MessagingInterface::Message* msg) {
-    switch (msg->type) {
-        case SKSE::MessagingInterface::kDataLoaded: {
+       if (msg->type == SKSE::MessagingInterface::kDataLoaded) {
             IsCycleMovesetActive();
             AttackStateManager::GetSingleton()->Register();
             SKSE::log::info("Evento kDataLoaded recebido. Procurando BGSAction...");
@@ -24,26 +23,14 @@ void OnMessage(SKSE::MessagingInterface::Message* msg) {
             Bash = RE::TESForm::LookupByID<RE::BGSAction>(0x1B417);
             BFCOMenu::LoadSettings();
             BFCOMenu::Register();
-            SKSE::log::info("Tentando registrar AnimationEventHandler...");
-            auto* animationEventSource = RE::PlayerCharacter::GetSingleton();
-            if (animationEventSource) {
-                animationEventSource->AddAnimationGraphEventSink(AnimationEventHandler::GetSingleton());
-                SKSE::log::info("AnimationEventHandler registrado com sucesso no PlayerCharacter.");
-            } else {
-                SKSE::log::error(
-                    "Falha ao registrar AnimationEventHandler: PlayerCharacter não encontrado durante kDataLoaded.");
-            }
-            break;
-        }
-        case SKSE::MessagingInterface::kPostLoadGame:
-            BFCOMenu::UpdateGameGlobals();
-            GetAttackKeys();
-
-            break;
-        case SKSE::MessagingInterface::kNewGame: {
-            BFCOMenu::UpdateGameGlobals();
-            GetAttackKeys();
-            break;
+       }
+    if (msg->type == SKSE::MessagingInterface::kNewGame || msg->type == SKSE::MessagingInterface::kPostLoadGame) {
+        BFCOMenu::UpdateGameGlobals();
+        GetAttackKeys();
+        auto* animationEventSource = RE::PlayerCharacter::GetSingleton();
+        if (animationEventSource) {
+            animationEventSource->AddAnimationGraphEventSink(GlobalControl::AnimationEventHandler::GetSingleton());
+            SKSE::log::info("AnimationEventHandler registrado com sucesso.");
         }
     }
 }

@@ -6,6 +6,7 @@
 #include <Windows.h>
 #include <map>
 #include <string>
+#include <chrono>
 
 class AnimationEventHandler : public RE::BSTEventSink<RE::BSAnimationGraphEvent> {
 public:
@@ -50,11 +51,13 @@ private:
     };
 
     AttackButtonState _attackState = AttackButtonState::kNone;
-    std::chrono::steady_clock::time_point _attackPressTime;
+    std::chrono::steady_clock::time_point _attackButtonPressTime;
+    bool _isAttackButtonPressed = false;
+    const float _powerAttackHoldThreshold = 0.2f;
     std::chrono::steady_clock::time_point _comboWindowExpireTime;  // NOVO CRONÔMETRO!
 
-    const std::chrono::milliseconds _powerAttackThreshold{200};
-    const std::chrono::milliseconds _comboWindowDuration{1000};
+    const std::chrono::milliseconds _powerAttackThreshold{80};
+    const std::chrono::milliseconds _comboWindowDuration{2000};
     void OpenComboWindow();
 
 };
@@ -77,4 +80,15 @@ extern RE::BGSAction* Bash;
 
 void GetAttackKeys();
 
+namespace GlobalControl{
+    class AnimationEventHandler : public RE::BSTEventSink<RE::BSAnimationGraphEvent> {
+    public:
+        static AnimationEventHandler* GetSingleton() {
+            static AnimationEventHandler singleton;
+            return &singleton;
+        }
 
+        RE::BSEventNotifyControl ProcessEvent(const RE::BSAnimationGraphEvent* a_event,
+                                              RE::BSTEventSource<RE::BSAnimationGraphEvent>*) override;
+    };
+}

@@ -262,7 +262,10 @@ void GetAttackKeys() {
     Settings::AttackKey_m += 256;  // Ajusta o código do mouse para corresponder às configurações
     Settings::AttackKey_g = controlMap->GetMappedKey(userEvents->rightAttack, RE::INPUT_DEVICE::kGamepad);
     logger::info("AttackKey_g (before conversion): {}", Settings::AttackKey_g);
-
+    /*auto* gsc = RE::GameSettingCollection::GetSingleton();
+    RE::Setting* setting = gsc->GetSetting("fInitialPowerAttackDelay");
+    float newDelay = 1100.0f / 1000.0f;
+    setting->data.f = newDelay;*/
 
     // leftAttackKeyKeyboard = controlMap->GetMappedKey(userEvents->leftAttack, RE::INPUT_DEVICE::kKeyboard);
     // leftAttackKeyMouse = controlMap->GetMappedKey(userEvents->leftAttack, RE::INPUT_DEVICE::kMouse);
@@ -291,10 +294,7 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
             continue;
         }
 
-        // Vamos processar tanto o pressionar quanto o soltar do botão
-        if (!buttonEvent->IsDown() && !buttonEvent->IsUp() && !buttonEvent->IsHeld()) {
-            continue;
-        }
+
 
         if (IsAnyMenuOpen()) {
             // logger::info("menu aberto");
@@ -353,13 +353,6 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                 player->NotifyAnimationGraph("blockStart");
                 player->SetGraphVariableBool("IsBlocking", true);
                 player->SetGraphVariableInt("BFCO_IsBlocking", 1);
-            }else if (buttonEvent->IsHeld()) {
-                _isCurrentlyBlocking = true;
-                logger::info("[TESTE] Botão de Bloqueio PRESSIONADO. _isCurrentlyBlocking = {}", _isCurrentlyBlocking);
-                // Lógica de animação de bloqueio aqui (opcional para o teste)
-                player->NotifyAnimationGraph("blockStart");
-                player->SetGraphVariableBool("IsBlocking", true);
-                player->SetGraphVariableInt("BFCO_IsBlocking", 1);
             } else if (buttonEvent->IsUp()) {
                 _isCurrentlyBlocking = false;
                 logger::info("[TESTE] Botão de Bloqueio SOLTO. _isCurrentlyBlocking = {}", _isCurrentlyBlocking);
@@ -375,166 +368,87 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
             logger::info("Janela de combo expirou.");
             _attackState = AttackButtonState::kNone;
         }
+        bool canCombo = false;
+        bool canAttack = false;
+        player->GetGraphVariableBool("NEW_BFCO_IsInComboWindow", canCombo);
+        logger::info("canCombo: {}", canCombo);
 
-
-        if (buttonEvent->IsDown()) {
-            if (_isCurrentlyBlocking && isAttackBtnPressed) {
-                    logger::info("[TESTE] SUCESSO! Condição de Bash atendida!");
-                    player->SetGraphVariableInt("IsBashing", 1);
-                    if (player->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina) > 0) {
-                        player->NotifyAnimationGraph("MCO_EndAnimation");
-                        if (auto* bash = GetIdleByFormID(0x8C0, pluginName)) {  // Use o FormID correto
-                            PlayIdleAnimation(player, bash);
-                        }
-                        player->NotifyAnimationGraph("blockStart");
-                        player->SetGraphVariableBool("IsBlocking", true);
-                        player->SetGraphVariableInt("BFCO_IsBlocking", 1);
-                    } else {
-                        player->NotifyAnimationGraph("MCO_EndAnimation"); 
-                        player->NotifyAnimationGraph("blockStart");
-                        player->SetGraphVariableBool("IsBlocking", true);
-                        player->SetGraphVariableInt("BFCO_IsBlocking", 1);
-                    }
-                    return RE::BSEventNotifyControl::kStop;  // Importante: Intercepta o M1
-                
-            }
-            switch (_attackState) {
-                case AttackButtonState::kNone:
-                    // ESTADO: Ocioso. Estamos iniciando um novo ataque.
-                    // AGORA, verificamos QUAL TECLA foi pressionada.
-                    if (isAttackBtnPressed) {
-                        // Inicia a sequência de "toque vs. segurar" para o M1.
-                        _attackState = AttackButtonState::kPressed;
-                        _attackPressTime = now;
-                        player->SetGraphVariableInt("NEW_BFCO_IsNormalAttacking", 0);
-                    } else if (isPowerAttackKeyPressed) {
-                        // A tecla dedicada foi pressionada, executa o ataque forte e abre a janela.
-                        logger::info("Tecla Dedicada de Ataque Forte (do estado Ocioso)");
-                        if (player->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina) > 0) {
-                            player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 1);
-                            player->NotifyAnimationGraph("MCO_EndAnimation");
-                            if (!Settings::bEnableDirectionalAttack) {
-                                if (auto* idleToPlay = GetIdleByFormID(0x8C5, pluginName)) {  // Use o FormID correto
-                                    PlayIdleAnimation(player, idleToPlay);
-                                }
-                            } else {
-                                PerformAction(PowerRight, player);
-                            }
-                            this->OpenComboWindow();
-                        }
-                    }
-                    break;
-
-                case AttackButtonState::kPowerAttackReleased_ComboWindowOpen:
-                    // ESTADO: Janela de Combo Aberta. Estamos tentando um ataque de continuação.
-                    // AGORA, verificamos QUAL TECLA foi pressionada.
-                    if (isAttackBtnPressed) {
-                        // O jogador usou o M1 para um ataque NORMAL de combo.
-                        logger::info("Ataque Normal de Combo Detectado!");
-                        player->SetGraphVariableInt("NEW_BFCO_IsNormalAttacking", 1);
-                        player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 1);
-                        _attackState = AttackButtonState::kNone;  // Combo executado, reseta o estado.
-                    } else if (isPowerAttackKeyPressed) {
-                        // O jogador usou a tecla dedicada para um ataque FORTE de combo.
-                        logger::info("Ataque Forte de Combo Detectado!");
-                        if (player->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina) > 0) {
-                            player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 1);
-                            player->NotifyAnimationGraph("MCO_EndAnimation");
-                            if (!Settings::bEnableDirectionalAttack) {
-                                if (auto* idleToPlay = GetIdleByFormID(0x8C5, pluginName)) {  // Use o FormID correto
-                                    PlayIdleAnimation(player, idleToPlay);
-                                }
-                            } else {
-                                PerformAction(PowerRight, player);
-                            }
-
-                            this->OpenComboWindow();  // Re-abre a janela para combos contínuos
-                        }
-                    }
-                    break;
-            }
-
-            if (comboKeyPressed) {
-                bool hasCombo = false;
-                if (player->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina) <= 0) {
-                    isPlayerSprinting = false;
-                    return RE::BSEventNotifyControl::kContinue;
-                }
-
-                if (Settings::hasCMF) {
-                    player->GetGraphVariableBool("BFCO_HasCombo", hasCombo);
-                    if (hasCombo) {
-                        player->NotifyAnimationGraph("MCO_EndAnimation");
-                        player->NotifyAnimationGraph("BFCOAttackStart_Comb");
-                        if (auto* idleToPlay = GetIdleByFormID(0x8BF, pluginName)) {
-                            PlayIdleAnimation(player, idleToPlay);
-                        }
-                    } else {
-                        // Este é o ataque para quando você está PARADO e sem combo.
-                        player->NotifyAnimationGraph("MCO_EndAnimation");
-                        PerformAction(PowerRight, player);
-                    }
-                    return RE::BSEventNotifyControl::kStop;
-                }
-
-                else {
-                    player->NotifyAnimationGraph("MCO_EndAnimation");
-                    player->NotifyAnimationGraph("BFCOAttackStart_Comb");
-                    if (auto* idleToPlay = GetIdleByFormID(0x8BF, pluginName)) {
-                        PlayIdleAnimation(player, idleToPlay);
-                    }
-
-                    isPlayerSprinting = false;
-                    return RE::BSEventNotifyControl::kStop;
-                }
-            }
-
-        } else if (buttonEvent->IsHeld() && isAttackBtnPressed) {
-            // Lógica de Hold (só se aplica ao M1, que pode ser segurado)
-            if (_attackState == AttackButtonState::kPressed) {
-                if (now - _attackPressTime > _powerAttackThreshold) {
-                    _attackState = AttackButtonState::kHeld;
-                    logger::info("Ataque Forte Iniciado (Hold)");
-                    player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 1);
-                    player->SetGraphVariableInt("NEW_BFCO_IsNormalAttacking", 0);
-                }
-            }
-
-        } else if (buttonEvent->IsUp()) {
             if (isAttackBtnPressed) {
-                // Lógica de Release (só se aplica ao M1)
-                if (_attackState == AttackButtonState::kPressed) {
-                    if (now - _attackPressTime < _powerAttackThreshold) {
-                        // Se o tempo for MENOR que o limite, foi um toque verdadeiro.
-                        logger::info("Ataque Normal Simples Detectado (Tap)");
-                        player->SetGraphVariableInt("NEW_BFCO_IsNormalAttacking", 1);
-                        player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 0);
-                        // player->NotifyAnimationGraph("attackStart");
+                player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 1);
+                player->GetGraphVariableBool("BFCO_IsPlayerInputOK", canAttack);
+                logger::info("pode atacar? {}", canAttack);
+                
+                    if (buttonEvent->IsDown()) {
+                        _isAttackButtonPressed = true;
+                        _attackButtonPressTime = std::chrono::steady_clock::now();
+                            logger::info("Iniciando ataque de combo!");
+                            //player->SetGraphVariableInt("NEW_BFCO_IsNormalAttacking", 0);
+                        
+                    } else if (buttonEvent->IsUp()) {
+                        logger::info("Fechou aqui");
+                        _isAttackButtonPressed = false;
+                        std::chrono::duration<float> holdDuration =
+                            std::chrono::steady_clock::now() - _attackButtonPressTime;
 
-                    } else {
-                        // Se o tempo for MAIOR, foi um segurar, mas o evento IsHeld não disparou a tempo.
-                        // CORRIGIMOS O BUG AQUI, tratando como o fim de um ataque forte.
-                        logger::info("Fim de Ataque Forte (Detectado no IsUp) - Janela de Combo Aberta!");
-                        player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 0);
-                        this->OpenComboWindow();
+                        if (canAttack && holdDuration.count() >= _powerAttackHoldThreshold) {
+                            // Foi um segurar longo -> ATAQUE FORTE
+                            player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 1);
+                            player->SetGraphVariableInt("NEW_BFCO_IsNormalAttacking", 1);
+                            //player->SetGraphVariableInt("NEW_BFCO_IsNormalAttacking", 1);
+                        } else if ( holdDuration.count() <= _powerAttackHoldThreshold){
+                            // Foi um clique rápido -> ATAQUE NORMAL
+                            player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 0);
+                            player->SetGraphVariableInt("NEW_BFCO_IsNormalAttacking", 1);
+                        }else if ( holdDuration.count() >= _powerAttackHoldThreshold){
+                            // Foi um clique rápido -> ATAQUE NORMAL
+                            player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 1);
+                            player->SetGraphVariableInt("NEW_BFCO_IsNormalAttacking", 0);
+                        }
+                        
+
+                    }else if (buttonEvent->IsHeld()) {
+                        logger::info("quanto tempo ele pega isso?");
+                            //player->SetGraphVariableInt("NEW_BFCO_IsNormalAttacking", 1);
+
                     }
+             }
+            
+        if (comboKeyPressed) {
+                 bool hasCombo = false;
+                 if (player->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina) <= 0) {
+                     isPlayerSprinting = false;
+                     return RE::BSEventNotifyControl::kContinue;
+                 }
 
-                    // Em ambos os casos, a ação terminou, então resetamos o estado.
-                    _attackState = AttackButtonState::kNone;
+                 if (Settings::hasCMF) {
+                     player->GetGraphVariableBool("BFCO_HasCombo", hasCombo);
+                     if (hasCombo) {
+                         player->NotifyAnimationGraph("MCO_EndAnimation");
+                         player->NotifyAnimationGraph("BFCOAttackStart_Comb");
+                         if (auto* idleToPlay = GetIdleByFormID(0x8BF, pluginName)) {
+                             PlayIdleAnimation(player, idleToPlay);
+                         }
+                     } else {
+                         // Este é o ataque para quando você está PARADO e sem combo.
+                         player->NotifyAnimationGraph("MCO_EndAnimation");
+                         PerformAction(PowerRight, player);
+                     }
+                     return RE::BSEventNotifyControl::kContinue;
+                 }
+                 
+                 else {
+                     player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 1);
+                     player->SetGraphVariableInt("NEW_BFCO_IsNormalAttacking", 1);
+                     player->NotifyAnimationGraph("MCO_EndAnimation");
+                     player->NotifyAnimationGraph("BFCOAttackStart_Comb");
+                     if (auto* idleToPlay = GetIdleByFormID(0x8BF, pluginName)) {
+                         PlayIdleAnimation(player, idleToPlay);
+                     }
 
-                } else if (_attackState == AttackButtonState::kHeld) {
-                    // O estado é 'kHeld', então IsHeld disparou corretamente.
-                    // A lógica original aqui está correta.
-                    player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 0);
-                    this->OpenComboWindow();
-                }
-            }
-        } 
-
-
-        if (isAttackBtnPressed || isPowerAttackKeyPressed || isBlockBtnPressed || comboKeyPressed) {
-            return RE::BSEventNotifyControl::kStop;
-        }
+                     isPlayerSprinting = false;
+                     return RE::BSEventNotifyControl::kContinue;
+                 }
+             }
 
     }
 
@@ -548,35 +462,38 @@ void AttackStateManager::OpenComboWindow() {
     logger::info("Janela de Combo Aberta!");
 }
 
-RE::BSEventNotifyControl AnimationEventHandler::ProcessEvent(const RE::BSAnimationGraphEvent* a_event,
-                                                             RE::BSTEventSource<RE::BSAnimationGraphEvent>*) {
+RE::BSEventNotifyControl GlobalControl::AnimationEventHandler::ProcessEvent(
+    const RE::BSAnimationGraphEvent* a_event, RE::BSTEventSource<RE::BSAnimationGraphEvent>*) {
+    auto player = RE::PlayerCharacter::GetSingleton();
 
-    //auto player = RE::PlayerCharacter::GetSingleton();
-    //// Vamos filtrar os eventos para que a nossa lógica só execute se o evento veio do jogador.
-    //// Isso evita processar eventos de todos os NPCs ao redor.
-    //if (a_event && a_event->holder && a_event->holder->IsPlayerRef()) {
-    //    const std::string_view eventName = a_event->tag;
+    if (a_event && a_event->holder && a_event->holder->IsPlayerRef()) {
+        const std::string_view eventName = a_event->tag;
+       
+        if (eventName == "HitFrame") {
+            SKSE::log::info("Evento 'HitFrame' recebido do jogador!");
+            // Coloque aqui a sua lógica para o HitFrame...
 
-    //    // Agora, podemos verificar qual evento recebemos e executar nossa lógica.
-    //    if (eventName == "HitFrame") {
-    //        SKSE::log::info("Evento 'HitFrame' recebido do jogador!");
-    //        // Coloque aqui a sua lógica para o HitFrame...
+        } else if (eventName == "PowerAttack_Start_end") {
+            player->SetGraphVariableBool("NEW_BFCO_IsInComboWindow", true);
+            player->SetGraphVariableInt("NEW_BFCO_IsNormalAttacking", 0);
+            player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 0);
+            SKSE::log::info("Evento 'Bfco_AttackStartFX' recebido. Abrindo a janela de combo...");
+            // Ex: GetGraphVariable("BFCO_IsInComboWindow")->SetBool(true);
 
-    //    } else if (eventName == "Bfco_AttackStartFX") {
-    //        player->SetGraphVariableInt("NEW_BFCO_IsNormalAttacking", 0);
-    //        player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 0);
-    //        SKSE::log::info("Evento 'Bfco_AttackStartFX' recebido. Abrindo a janela de combo...");
-    //        // Ex: GetGraphVariable("BFCO_IsInComboWindow")->SetBool(true);
+        } else if (eventName == "MCO_PowerWinClose" || eventName == "MCO_WinClose") {
+            player->SetGraphVariableBool("NEW_BFCO_IsInComboWindow", false);
+            // player->SetGraphVariableInt("NEW_BFCO_IsNormalAttacking", 0);
+            // player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 1);
+            SKSE::log::info("Evento 'BFCO_IsPlayerInputOK' recebido. Fechando a janela de combo...");
 
-    //    } else if (eventName == "BFCO_IsPlayerInputOK") {
-    //        player->SetGraphVariableInt("NEW_BFCO_IsNormalAttacking", 1);
-    //        player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 1);
-    //         SKSE::log::info("Evento 'BFCO_IsPlayerInputOK' recebido. Fechando a janela de combo...");
-    //         // Ex: GetGraphVariable("BFCO_IsInComboWindow")->SetBool(false);
-    //    }
-    //    // Adicione quantos 'else if' você precisar para os eventos que quer ouvir.
-    //}
-
-    // Retorna kContinue para permitir que outros sinks (de outros mods ou do próprio jogo) também recebam este evento.
+        } else if (eventName == "MCO_PowerWinOpen" || eventName == "MCO_WinOpen" ||
+                   eventName == "BFCO_PlayerAttackStart") {
+            player->SetGraphVariableBool("NEW_BFCO_IsInComboWindow", true);
+           // player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 1);
+            // player->SetGraphVariableInt("NEW_BFCO_IsNormalAttacking", 0);
+            //player->SetGraphVariableInt("NEW_BFCO_IsNormalAttacking", 0);
+            SKSE::log::info("Evento 'BFCO_IsPlayerInputOK' recebido. Fechando a janela de combo...");
+        }
+    }
     return RE::BSEventNotifyControl::kContinue;
 }
