@@ -106,7 +106,7 @@ namespace BFCOMenu {
         ImGui::Spacing();
 
 
-        RenderKeybind("Block Key (Beta)", &Settings::BlockKey_k, &Settings::BlockKey_m, &Settings::BlockKey_g, true);
+        RenderKeybind("Block Key (Beta)", &Settings::BlockKey_k, &Settings::BlockKey_m, &Settings::BlockKey_g);
 
         ImGui::Spacing();
         ImGui::Separator();
@@ -116,6 +116,7 @@ namespace BFCOMenu {
             settings_changed = true;
         if (ImGui::Checkbox("Ativar Ataque Carregado (Clique Direito)", &Settings::bEnableRmbPowerAttack))
             settings_changed = true;*/
+        //if (ImGui::Checkbox("Disable bash when lo", &Settings::disableMStaBash)) settings_changed = true;
         if (ImGui::Checkbox("Disable jump attack (Beta)", &Settings::bDisableJumpingAttack)) settings_changed = true;
         if (ImGui::Checkbox("Disable power attack LMB (Beta)", &Settings::bPowerAttackLMB)) settings_changed = true;
         //if (ImGui::Checkbox("Lock sprint attack behind perk", &Settings::lockSprintAttack)) settings_changed = true;
@@ -136,6 +137,7 @@ namespace BFCOMenu {
         // Mapeia nossas variáveis C++ para os EditorIDs das Globals no .esp
         std::map<const char*, float> globalsToUpdate = {
             {"bfcoTG_KeyAttackComb", Settings::bEnableComboAttack ? 1.0f : 0.0f},
+            {"bfcoINT_KeyAttackComb", Settings::bEnableComboAttack ? 1.0f : 0.0f},
             {"bfcoDebug_DisJumpAttack", Settings::bDisableJumpingAttack ? 1.0f : 0.0f},
             //{"BFCO_StrongAttackIsOK", 1.0f },
             //{"BFCO_NormalAttackIsOK", 1.0f },

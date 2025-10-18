@@ -30,6 +30,7 @@ namespace Settings {
     inline uint32_t AttackKey_g = -2;  // Controle (LB / L1)
     inline bool hasCMF = false;
     inline bool lockSprintAttack = false;
+    inline bool disableMStaBash = false;
 }
 
 // Namespace para organizar as funções do nosso menu

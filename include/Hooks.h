@@ -41,7 +41,6 @@ private:
     bool isAttacking = false;
     bool isPlayerSprinting = false;
     bool isPlayerMoving = false;
-    bool isBlocking = false;
     bool _isCurrentlyBlocking = false;
     enum class AttackButtonState {
         kNone,
