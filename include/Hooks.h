@@ -74,6 +74,7 @@ extern RE::BGSAction* PowerStanding;
 extern RE::BGSAction* PowerLeft;
 extern RE::BGSAction* PowerDual;
 extern RE::BGSAction* NormalAttack;
+extern RE::BGSAction* RightAttack;
 extern RE::BGSAction* PowerAttack;
 extern RE::BGSAction* Bash;
 

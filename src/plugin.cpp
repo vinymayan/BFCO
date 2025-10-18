@@ -19,6 +19,7 @@ void OnMessage(SKSE::MessagingInterface::Message* msg) {
             PowerLeft = RE::TESForm::LookupByID<RE::BGSAction>(0x2E2F6);
             PowerDual = RE::TESForm::LookupByID<RE::BGSAction>(0x2E2F7);
             NormalAttack = RE::TESForm::LookupByID<RE::BGSAction>(0x13005);
+            RightAttack = RE::TESForm::LookupByID<RE::BGSAction>(0x13004);
             PowerAttack = RE::TESForm::LookupByID<RE::BGSAction>(0xE8456);
             Bash = RE::TESForm::LookupByID<RE::BGSAction>(0x1B417);
             BFCOMenu::LoadSettings();

@@ -14,6 +14,7 @@ RE::BGSAction* PowerStanding = nullptr;
 RE::BGSAction* PowerLeft = nullptr;
 RE::BGSAction* PowerDual = nullptr;
 RE::BGSAction* NormalAttack = nullptr;
+RE::BGSAction* RightAttack = nullptr;
 RE::BGSAction* PowerAttack = nullptr;
 RE::BGSAction* Bash = nullptr;
 
@@ -247,6 +248,7 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
         player->GetGraphVariableBool("ADTF_ShouldDelay", isStrong);
         float currentStamina = player->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina);
         auto* PowerNormal = GetIdleByFormID(0x8C5, pluginName);
+        auto* PowerBash = GetIdleByFormID(0x8C0, pluginName);
         auto* SprintPower = GetIdleByFormID(0x8BE, pluginName);
         auto* ComboAttackE = GetIdleByFormID(0x8BF, pluginName);
         auto* BlockStart = GetIdleByFormID(0x13217, skyrim);
@@ -259,51 +261,24 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
             if (buttonEvent->IsDown()) {
                 _isCurrentlyBlocking = true;
                 player->NotifyAnimationGraph("blockStart");
-                player->SetGraphVariableBool("IsBlocking", true);
-                player->SetGraphVariableInt("BFCO_IsBlocking", 1);
             } else if (buttonEvent->IsHeld()) {
                 _isCurrentlyBlocking = true;
-                player->SetGraphVariableBool("IsBlocking", true);
-                player->SetGraphVariableInt("BFCO_IsBlocking", 1);
             } else if (!_isCurrentlyBlocking && buttonEvent->IsHeld()) {
                 _isCurrentlyBlocking = true;
                 player->NotifyAnimationGraph("blockStart");
-                player->SetGraphVariableBool("IsBlocking", true);
-                player->SetGraphVariableInt("BFCO_IsBlocking", 1);
             } else if (buttonEvent->IsUp()) {
                 _isCurrentlyBlocking = false;
-                //logger::info("[TESTE] Botão de Bloqueio SOLTO. _isCurrentlyBlocking = {}", _isCurrentlyBlocking);
-                player->SetGraphVariableInt("BFCO_IsBlocking", 0);
-                player->SetGraphVariableBool("IsBlocking", false);
+
                 player->NotifyAnimationGraph("blockStop");
             }
         }
-
         if (buttonEvent->IsDown()) {
             if (isAttackBtnPressed) {
                 if (_isCurrentlyBlocking) {
-                    float bashStaminaCost = 35.0f;  
-                    if (currentStamina >= bashStaminaCost) {
-                        player->NotifyAnimationGraph("bashStart");
-                        player->NotifyAnimationGraph("MCO_EndAnimation");
-                        player->NotifyAnimationGraph("bashRelease");
-                        player->AsActorValueOwner()->DamageActorValue(RE::ActorValue::kStamina, bashStaminaCost);
-                        player->NotifyAnimationGraph("blockStart");
-                        player->SetGraphVariableBool("IsBlocking", true);
-                        player->SetGraphVariableInt("BFCO_IsBlocking", 1);
+                    float bashStaminaCost = 5.0f;  
+                        //player->NotifyAnimationGraph("bashStart");
+                        PerformAction(RightAttack, player);
                         _isCurrentlyBlocking = false;
-                    } else if (Settings::disableMStaBash && currentStamina > 0 && currentStamina < bashStaminaCost) {
-                        player->NotifyAnimationGraph("bashStart");
-                        player->NotifyAnimationGraph("MCO_EndAnimation");
-                        player->NotifyAnimationGraph("bashRelease");
-                        player->AsActorValueOwner()->DamageActorValue(RE::ActorValue::kStamina, currentStamina);
-                        player->NotifyAnimationGraph("blockStart");
-                        player->SetGraphVariableBool("IsBlocking", true);
-                        player->SetGraphVariableInt("BFCO_IsBlocking", 1);
-                        _isCurrentlyBlocking = false;
-                    } else {
-                        player->NotifyAnimationGraph("bashFail"); // Exemplo
-                    }
                 }
                 if (canAttack) {
                     player->SetGraphVariableInt("NEW_BFCO_IsNormalAttacking", 1);
@@ -319,37 +294,19 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                     return RE::BSEventNotifyControl::kContinue;  // Não faz o ataque de sprint
                 }
 
-                if (_isCurrentlyBlocking) {
-                    float PowerStamina = 70.0f;  // Defina o custo de stamina aqui
-                    if (currentStamina >= PowerStamina) {
-                        player->NotifyAnimationGraph("bashPowerStart");
-                        player->AsActorValueOwner()->DamageActorValue(RE::ActorValue::kStamina, PowerStamina);
-                        player->NotifyAnimationGraph("blockStart");
-                        player->SetGraphVariableBool("IsBlocking", true);
-                        player->SetGraphVariableInt("BFCO_IsBlocking", 1);
-                        _isCurrentlyBlocking = false;
-
-                    } else if (Settings::disableMStaBash && currentStamina > 0 && currentStamina < PowerStamina) {
-                        player->NotifyAnimationGraph("bashPowerStart");
-                        player->AsActorValueOwner()->DamageActorValue(RE::ActorValue::kStamina, currentStamina);
-                        player->NotifyAnimationGraph("blockStart");
-                        player->SetGraphVariableBool("IsBlocking", true);
-                        player->SetGraphVariableInt("BFCO_IsBlocking", 1);
-                        _isCurrentlyBlocking = false;
-
-                    } else {
-                        player->NotifyAnimationGraph("bashFail"); 
-                    }
-                } else {
                     if (SprintPower->conditions.IsTrue(player, player)) {
                         player->NotifyAnimationGraph("MCO_EndAnimation");
                         PlayIdleAnimation(player, SprintPower);
+                    } else if (PowerBash->conditions.IsTrue(player, player)) {
+                        player->NotifyAnimationGraph("MCO_EndAnimation");
+                        PlayIdleAnimation(player, PowerBash);
                     } else {
                         player->NotifyAnimationGraph("MCO_EndAnimation");
-                        PlayIdleAnimation(player, PowerNormal);
-                        //PerformAction(PowerRight, player);
+                        //PlayIdleAnimation(player, PowerNormal);
+                        player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 1);
+                        PerformAction(PowerRight, player);
                     }
-                }
+                
             }
             if (Settings::bEnableComboAttack) {
                 if (comboKeyPressed) {
