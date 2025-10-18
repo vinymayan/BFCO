@@ -248,6 +248,7 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
         player->GetGraphVariableBool("ADTF_ShouldDelay", isStrong);
         float currentStamina = player->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina);
         auto* PowerNormal = GetIdleByFormID(0x8C5, pluginName);
+        auto* PowerH2H = GetIdleByFormID(0x839, pluginName);
         auto* PowerBash = GetIdleByFormID(0x8C0, pluginName);
         auto* SprintPower = GetIdleByFormID(0x8BE, pluginName);
         auto* ComboAttackE = GetIdleByFormID(0x8BF, pluginName);
@@ -268,7 +269,6 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                 player->NotifyAnimationGraph("blockStart");
             } else if (buttonEvent->IsUp()) {
                 _isCurrentlyBlocking = false;
-
                 player->NotifyAnimationGraph("blockStop");
             }
         }
@@ -293,18 +293,20 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                 if (player->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina) <= 0) {
                     return RE::BSEventNotifyControl::kContinue;  // Não faz o ataque de sprint
                 }
-
                     if (SprintPower->conditions.IsTrue(player, player)) {
                         player->NotifyAnimationGraph("MCO_EndAnimation");
                         PlayIdleAnimation(player, SprintPower);
                     } else if (PowerBash->conditions.IsTrue(player, player)) {
                         player->NotifyAnimationGraph("MCO_EndAnimation");
                         PlayIdleAnimation(player, PowerBash);
+                    } else if (PowerH2H->conditions.IsTrue(player, player)) {
+                        player->NotifyAnimationGraph("MCO_EndAnimation");
+                        PlayIdleAnimation(player, PowerH2H);
                     } else {
                         player->NotifyAnimationGraph("MCO_EndAnimation");
-                        //PlayIdleAnimation(player, PowerNormal);
                         player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 1);
-                        PerformAction(PowerRight, player);
+                        PlayIdleAnimation(player, PowerNormal);
+                        //PerformAction(PowerRight, player);
                     }
                 
             }
@@ -333,11 +335,18 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                     } else if (SprintPower->conditions.IsTrue(player, player)) {
                         player->NotifyAnimationGraph("MCO_EndAnimation");
                         PlayIdleAnimation(player, SprintPower);
-                    }
-                    else {
+                    } else if (PowerBash->conditions.IsTrue(player, player)) {
                         player->NotifyAnimationGraph("MCO_EndAnimation");
+                        PlayIdleAnimation(player, PowerBash);
+                    } else if (PowerH2H->conditions.IsTrue(player, player)) {
+                        player->NotifyAnimationGraph("MCO_EndAnimation");
+                        PlayIdleAnimation(player, PowerH2H);
+                    } else {
+                        player->NotifyAnimationGraph("MCO_EndAnimation");
+                        player->NotifyAnimationGraph("BFCOAttackStart_Comb");
                         PlayIdleAnimation(player, ComboAttackE);
                     }
+                    
                 }
             } 
         } 

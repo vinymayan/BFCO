@@ -137,7 +137,7 @@ namespace BFCOMenu {
         // Mapeia nossas variáveis C++ para os EditorIDs das Globals no .esp
         std::map<const char*, float> globalsToUpdate = {
             {"bfcoTG_KeyAttackComb", Settings::bEnableComboAttack ? 1.0f : 0.0f},
-            {"bfcoINT_KeyAttackComb", Settings::bEnableComboAttack ? 1.0f : 0.0f},
+            {"bfcoINT_KeyAttackComb", Settings::bEnableComboAttack ? 2.0f : 0.0f},
             {"bfcoDebug_DisJumpAttack", Settings::bDisableJumpingAttack ? 1.0f : 0.0f},
             //{"BFCO_StrongAttackIsOK", 1.0f },
             //{"BFCO_NormalAttackIsOK", 1.0f },
