@@ -2,7 +2,7 @@
 #include "Settings.h"
 
 
-// Declaramos as variáveis globais que definimos no main.cpp para que este arquivo saiba que elas existem.
+// Declaramos as variÃ¡veis globais que definimos no main.cpp para que este arquivo saiba que elas existem.
 extern const SKSE::TaskInterface* g_task;
 
 const std::string pluginName = "SCSI-ACTbfco-Main.esp";
@@ -29,7 +29,7 @@ void AttackStateManager::Register() {
     } else {
         // LOG ADICIONADO: Informa explicitamente se o gerenciador de input for nulo.
         SKSE::log::error(
-            "FALHA: O gerenciador de input (BSInputDeviceManager) é nulo. O listener não pôde ser registrado.");
+            "FALHA: O gerenciador de input (BSInputDeviceManager) Ã© nulo. O listener nÃ£o pÃ´de ser registrado.");
     }
 
 
@@ -39,27 +39,27 @@ RE::TESIdleForm* GetIdleByFormID(RE::FormID a_formID, const std::string& a_plugi
     auto* dataHandler = RE::TESDataHandler::GetSingleton();
     RE::TESForm* lookupForm = dataHandler ? dataHandler->LookupForm(a_formID, a_pluginName) : nullptr;
     if (!lookupForm) {
-        SKSE::log::warn("Não foi possível encontrar o FormID 0x{:X} no plugin {}", a_formID, a_pluginName);
+        SKSE::log::warn("NÃ£o foi possÃ­vel encontrar o FormID 0x{:X} no plugin {}", a_formID, a_pluginName);
         return nullptr;
     }
-    // Verificamos se o tipo do formulário é IdleForm e fazemos o cast.
+    // Verificamos se o tipo do formulÃ¡rio Ã© IdleForm e fazemos o cast.
     if (lookupForm->GetFormType() == RE::FormType::Idle) {
         return static_cast<RE::TESIdleForm*>(lookupForm);
     }
-    SKSE::log::warn("O FormID 0x{:X} não é um TESIdleForm.", a_formID);
+    SKSE::log::warn("O FormID 0x{:X} nÃ£o Ã© um TESIdleForm.", a_formID);
     return nullptr;
 }
 
 void PlayIdleAnimation(RE::Actor* a_actor, RE::TESIdleForm* a_idle) {
     if (a_actor && a_idle) {
         if (auto* processManager = a_actor->GetActorRuntimeData().currentProcess) {
-            // [MODIFICADO] Usando a assinatura exata que você encontrou: (ator, idle, alvo)
-            // Como a animação é para o próprio ator, ele será o seu próprio alvo.
+            // [MODIFICADO] Usando a assinatura exata que vocÃª encontrou: (ator, idle, alvo)
+            // Como a animaÃ§Ã£o Ã© para o prÃ³prio ator, ele serÃ¡ o seu prÃ³prio alvo.
             processManager->PlayIdle(a_actor, a_idle, a_actor);
 
-            // SKSE::log::info("Tocando animação idle FormID 0x{:X}", a_idle->GetFormID());
+            // SKSE::log::info("Tocando animaÃ§Ã£o idle FormID 0x{:X}", a_idle->GetFormID());
         } else {
-            SKSE::log::error("Não foi possível obter o AIProcess (currentProcess) do ator.");
+            SKSE::log::error("NÃ£o foi possÃ­vel obter o AIProcess (currentProcess) do ator.");
         }
     }
 }
@@ -70,7 +70,7 @@ RE::BGSAction* GetActionByFormID(RE::FormID a_formID, const std::string& a_plugi
 
     auto* lookupForm = dataHandler->LookupForm(a_formID, a_pluginName);
     if (!lookupForm) {
-        SKSE::log::warn("Não foi possível encontrar o FormID 0x{:X} no plugin {}", a_formID, a_pluginName);
+        SKSE::log::warn("NÃ£o foi possÃ­vel encontrar o FormID 0x{:X} no plugin {}", a_formID, a_pluginName);
         return nullptr;
     }
     return lookupForm->As<RE::BGSAction>();
@@ -104,7 +104,7 @@ bool IsAnyMenuOpen() {
      }*/
 
     // 2. Verifica menus que precisam do cursor (a maioria dos menus ImGui, como o Wheeler)
-    // Se este contador for maior que 0, algo está forçando o cursor a aparecer.
+    // Se este contador for maior que 0, algo estÃ¡ forÃ§ando o cursor a aparecer.
     for (const auto a_name : blockedMenus) {
         if (ui->IsMenuOpen(a_name)) {
             return true;
@@ -112,45 +112,6 @@ bool IsAnyMenuOpen() {
     }
     return false;
 }
-
-void AddPerk(RE::Actor* a_actor, RE::BGSPerk* a_perk) {
-    // 1. Verificações de segurança para evitar crashes
-    if (!a_actor || !a_perk) {
-        SKSE::log::warn("AddPerk foi chamado com um ator ou perk nulo.");
-        return;
-    }
-
-    // 2. A condição principal: O ator já tem este perk?
-    if (a_actor->HasPerk(a_perk)) {
-        SKSE::log::info("O ator '{}' já possui o perk '{}'. Nenhuma ação necessária.", a_actor->GetName(),
-                        a_perk->GetName());
-        return;  // Sai da função se o perk já existe
-    }
-
-    // 3. Se o ator não tem o perk, nós o adicionamos.
-    //    Perks são adicionados ao 'ActorBase' (TESNPC), que é a "planta" do ator.
-    auto actorBase = a_actor->GetActorBase();
-    if (actorBase) {
-        actorBase->AddPerk(a_perk, 1);  // O '1' é o rank do perk, geralmente 1.
-        SKSE::log::info("Perk '{}' adicionado com sucesso ao ator '{}'.", a_perk->GetName(), a_actor->GetName());
-    } else {
-        SKSE::log::error("Não foi possível obter o ActorBase para o ator '{}'.", a_actor->GetName());
-    }
-}
-
-RE::BGSPerk* GetPerkByEditorID(RE::FormID a_formID) {
-    auto perk = RE::TESForm::LookupByID<RE::BGSPerk>(a_formID);
-
-    if (!perk) {
-        // Este log será acionado se o FormID não for encontrado ou se o formulário encontrado não for um perk.
-        // Usamos 0x{:X} para formatar o ID em hexadecimal, que é o padrão para FormIDs.
-        SKSE::log::warn("Não foi possível encontrar o perk com FormID: 0x{:X}", a_formID);
-    }
-
-    return perk;
-}
-
-
 
 void GetAttackKeys() {
     auto* controlMap = RE::ControlMap::GetSingleton();
@@ -160,7 +121,7 @@ void GetAttackKeys() {
     logger::info("AttackKey_k: {}", Settings::AttackKey_k);
     Settings::AttackKey_m = controlMap->GetMappedKey(userEvents->rightAttack, RE::INPUT_DEVICE::kMouse);
     logger::info("AttackKey_m: {}", Settings::AttackKey_m);
-    Settings::AttackKey_m += 256;  // Ajusta o código do mouse para corresponder às configurações
+    Settings::AttackKey_m += 256;  // Ajusta o cÃ³digo do mouse para corresponder Ã s configuraÃ§Ãµes
     Settings::AttackKey_g = controlMap->GetMappedKey(userEvents->rightAttack, RE::INPUT_DEVICE::kGamepad);
     logger::info("AttackKey_g (before conversion): {}", Settings::AttackKey_g);
     /*auto* gsc = RE::GameSettingCollection::GetSingleton();
@@ -205,7 +166,7 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
 
         auto device = buttonEvent->GetDevice();
         auto keyCode = buttonEvent->GetIDCode();
-        // --- INÍCIO DA LÓGICA REORDENADA ---
+        // --- INÃCIO DA LÃ“GICA REORDENADA ---
         const auto playerState = player->AsActorState();
 
 
@@ -219,7 +180,7 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
         }
 
         if (device == RE::INPUT_DEVICE::kMouse) {
-            keyCode += 256;  // Ajusta o código do mouse para corresponder às configurações
+            keyCode += 256;  // Ajusta o cÃ³digo do mouse para corresponder Ã s configuraÃ§Ãµes
         }
 
         bool isAttackBtnPressed = (device == RE::INPUT_DEVICE::kKeyboard && keyCode == Settings::AttackKey_k) ||
@@ -255,16 +216,11 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
         auto* BlockStart = GetIdleByFormID(0x13217, skyrim);
         auto* BashStart = GetIdleByFormID(0x1B417, skyrim);
         auto* BashRelease = GetIdleByFormID(0x1457A, skyrim);
-        // --- LÓGICA DE TESTE SIMPLIFICADA ---
+        // --- LÃ“GICA DE TESTE SIMPLIFICADA ---
 
-        // ESTÁGIO 1: Gerenciar nosso estado de bloqueio
+        // ESTÃGIO 1: Gerenciar nosso estado de bloqueio
         if (isBlockBtnPressed) {
             if (buttonEvent->IsDown()) {
-                _isCurrentlyBlocking = true;
-                player->NotifyAnimationGraph("blockStart");
-            } else if (buttonEvent->IsHeld()) {
-                _isCurrentlyBlocking = true;
-            } else if (!_isCurrentlyBlocking && buttonEvent->IsHeld()) {
                 _isCurrentlyBlocking = true;
                 player->NotifyAnimationGraph("blockStart");
             } else if (buttonEvent->IsUp()) {
@@ -274,6 +230,7 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
         }
         if (buttonEvent->IsDown()) {
             if (isAttackBtnPressed) {
+                player->NotifyAnimationGraph("MCO_EndAnimation");
                 if (_isCurrentlyBlocking) {
                     float bashStaminaCost = 5.0f;  
                         //player->NotifyAnimationGraph("bashStart");
@@ -291,7 +248,7 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
 
             if (isPowerAttackKeyPressed) {
                 if (player->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina) <= 0) {
-                    return RE::BSEventNotifyControl::kContinue;  // Não faz o ataque de sprint
+                    return RE::BSEventNotifyControl::kContinue;  // NÃ£o faz o ataque de sprint
                 }
                     if (SprintPower->conditions.IsTrue(player, player)) {
                         player->NotifyAnimationGraph("MCO_EndAnimation");
@@ -323,7 +280,12 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                             player->NotifyAnimationGraph("MCO_EndAnimation");
                             if (SprintPower->conditions.IsTrue(player, player)) {
                                 PlayIdleAnimation(player, SprintPower);
+                            } else if (PowerBash->conditions.IsTrue(player, player)) {
+                        PlayIdleAnimation(player, PowerBash);
+                    } else if (PowerH2H->conditions.IsTrue(player, player)) {
+                        PlayIdleAnimation(player, PowerH2H);
                             } else {
+                                player->NotifyAnimationGraph("BFCOAttackStart_Comb");
                                 PlayIdleAnimation(player, ComboAttackE);
                             }
                             
