@@ -156,26 +156,20 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
             continue;
         }
 
-
-
         if (IsAnyMenuOpen()) {
-            // logger::info("menu aberto");
             return RE::BSEventNotifyControl::kContinue;
         }
-        const auto* userEvents = RE::UserEvents::GetSingleton();
-
+       
         auto device = buttonEvent->GetDevice();
         auto keyCode = buttonEvent->GetIDCode();
-        // --- INÍCIO DA LÓGICA REORDENADA ---
         const auto playerState = player->AsActorState();
-
+        
 
         if (!(!player->IsInKillMove() && playerState->GetWeaponState() == RE::WEAPON_STATE::kDrawn &&
               playerState->GetSitSleepState() == RE::SIT_SLEEP_STATE::kNormal &&
               playerState->GetKnockState() == RE::KNOCK_STATE_ENUM::kNormal &&
               playerState->GetKnockState() == RE::KNOCK_STATE_ENUM::kNormal &&
               playerState->GetFlyState() == RE::FLY_STATE::kNone)) {
-            isPlayerSprinting = false;
             return RE::BSEventNotifyControl::kContinue;
         }
 
@@ -183,25 +177,38 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
             keyCode += 256;  // Ajusta o código do mouse para corresponder às configurações
         }
 
+        bool isBlockBtnPressed = (device == RE::INPUT_DEVICE::kKeyboard && keyCode == Settings::BlockKey_k) ||
+                                 (device == RE::INPUT_DEVICE::kMouse && keyCode == Settings::BlockKey_m) ||
+                                 (device == RE::INPUT_DEVICE::kGamepad && keyCode == Settings::BlockKey_g);
+        
         bool isAttackBtnPressed = (device == RE::INPUT_DEVICE::kKeyboard && keyCode == Settings::AttackKey_k) ||
                                   (device == RE::INPUT_DEVICE::kMouse && keyCode == Settings::AttackKey_m) ||
                                   (device == RE::INPUT_DEVICE::kGamepad && keyCode == Settings::AttackKey_g);
 
-        bool isPowerAttackKeyPressed =
-            (device == RE::INPUT_DEVICE::kKeyboard && keyCode == Settings::PowerAttackKey_k) ||
-            (device == RE::INPUT_DEVICE::kMouse && keyCode == Settings::PowerAttackKey_m) ||
-            (device == RE::INPUT_DEVICE::kGamepad && keyCode == Settings::PowerAttackKey_g);
+        bool isPowerAttackKeyPressed = (device == RE::INPUT_DEVICE::kKeyboard && keyCode == Settings::PowerAttackKey_k) ||
+                                       (device == RE::INPUT_DEVICE::kMouse && keyCode == Settings::PowerAttackKey_m) ||
+                                       (device == RE::INPUT_DEVICE::kGamepad && keyCode == Settings::PowerAttackKey_g);
 
-        bool isBlockBtnPressed = (device == RE::INPUT_DEVICE::kKeyboard && keyCode == Settings::BlockKey_k) ||
-                                 (device == RE::INPUT_DEVICE::kMouse && keyCode == Settings::BlockKey_m) ||
-                                 (device == RE::INPUT_DEVICE::kGamepad && keyCode == Settings::BlockKey_g);
+        
 
         bool comboKeyPressed = (device == RE::INPUT_DEVICE::kKeyboard && keyCode == Settings::comboKey_k) ||
                                  (device == RE::INPUT_DEVICE::kMouse && keyCode == Settings::comboKey_m) ||
                                  (device == RE::INPUT_DEVICE::kGamepad && keyCode == Settings::comboKey_g);
 
+        if (isBlockBtnPressed) {
+            if (buttonEvent->IsDown()) {
+                Settings::_isCurrentlyBlocking = true;
+                player->NotifyAnimationGraph("blockStart");
+            }
+
+            if (buttonEvent->IsUp()) {
+                Settings::_isCurrentlyBlocking = false;                
+                player->NotifyAnimationGraph("MCO_EndAnimation");
+                player->NotifyAnimationGraph("blockStop");
+            }
+        }
+
            
-        auto now = std::chrono::steady_clock::now();
         bool isStrong = false;
         bool canAttack = false;
         bool hasCombo = false;
@@ -216,39 +223,34 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
         auto* BlockStart = GetIdleByFormID(0x13217, skyrim);
         auto* BashStart = GetIdleByFormID(0x1B417, skyrim);
         auto* BashRelease = GetIdleByFormID(0x1457A, skyrim);
-        // --- LÓGICA DE TESTE SIMPLIFICADA ---
 
-        // ESTÁGIO 1: Gerenciar nosso estado de bloqueio
-        if (isBlockBtnPressed) {
-            if (buttonEvent->IsDown()) {
-                _isCurrentlyBlocking = true;
-                player->NotifyAnimationGraph("blockStart");
-            } else if (buttonEvent->IsUp()) {
-                _isCurrentlyBlocking = false;
-                player->NotifyAnimationGraph("blockStop");
-            }
+        if (player->IsBlocking()) {
+            Settings::_isCurrentlyBlocking = true;
+        } else {
+            Settings::_isCurrentlyBlocking = false;
         }
+
         if (buttonEvent->IsDown()) {
+            
             if (isAttackBtnPressed) {
+                logger::info("Botão de ataque precionado.");
                 player->NotifyAnimationGraph("MCO_EndAnimation");
-                if (_isCurrentlyBlocking) {
-                    float bashStaminaCost = 5.0f;  
+                if (Settings::_isCurrentlyBlocking) {
                         //player->NotifyAnimationGraph("bashStart");
                         PerformAction(RightAttack, player);
-                        _isCurrentlyBlocking = false;
                 }
-                if (canAttack) {
+                else if (canAttack) {
                     player->SetGraphVariableInt("NEW_BFCO_IsNormalAttacking", 1);
                     
                 }
-                if (isStrong) {
+                else if (isStrong) {
                     player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 1);
                 }
             }
 
             if (isPowerAttackKeyPressed) {
                 if (player->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina) <= 0) {
-                    return RE::BSEventNotifyControl::kContinue;  // Não faz o ataque de sprint
+                    return RE::BSEventNotifyControl::kContinue;  
                 }
                     if (SprintPower->conditions.IsTrue(player, player)) {
                         player->NotifyAnimationGraph("MCO_EndAnimation");
@@ -281,9 +283,9 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                             if (SprintPower->conditions.IsTrue(player, player)) {
                                 PlayIdleAnimation(player, SprintPower);
                             } else if (PowerBash->conditions.IsTrue(player, player)) {
-                        PlayIdleAnimation(player, PowerBash);
-                    } else if (PowerH2H->conditions.IsTrue(player, player)) {
-                        PlayIdleAnimation(player, PowerH2H);
+                                PlayIdleAnimation(player, PowerBash);
+                            } else if (PowerH2H->conditions.IsTrue(player, player)) {
+                                 PlayIdleAnimation(player, PowerH2H);
                             } else {
                                 player->NotifyAnimationGraph("BFCOAttackStart_Comb");
                                 PlayIdleAnimation(player, ComboAttackE);
@@ -312,13 +314,13 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                 }
             } 
         } 
+
         if (buttonEvent->IsUp()) {
             if (isPowerAttackKeyPressed) {
                 player->NotifyAnimationGraph("BFCOAttackstart_1");
             }
         }
     }
-
     return RE::BSEventNotifyControl::kContinue;
 }
 
@@ -335,7 +337,11 @@ RE::BSEventNotifyControl GlobalControl::AnimationEventHandler::ProcessEvent(
             player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 0);
 
 
-        } 
+        } else if (eventName == "blockStartOut") {
+            if (!Settings::_isCurrentlyBlocking) {
+                player->NotifyAnimationGraph("blockStop");
+            }
+        }
     }
     return RE::BSEventNotifyControl::kContinue;
 }

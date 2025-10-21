@@ -5,7 +5,7 @@
 
 namespace Settings {
     // Checkboxes (baseado no seu MCM)
-
+    inline bool _isCurrentlyBlocking = false;
     inline bool bEnableComboAttack = true;
     inline bool bEnableDirectionalAttack = true;
     //inline bool bEnableLmbPowerAttack = false;
