@@ -222,33 +222,33 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
          if (isBlockBtnPressed) {
             if (buttonEvent->IsDown()) {
                 Settings::_isCurrentlyBlocking = true;
-                player->SetGraphVariableInt("BFCO_IsBlocking", 1);
-                player->SetGraphVariableBool("IsBlocking", true);
+                /*player->SetGraphVariableInt("BFCO_IsBlocking", 1);
+                player->SetGraphVariableBool("IsBlocking", true);*/
+                player->NotifyAnimationGraph("MCO_EndAnimation");
+                player->NotifyAnimationGraph("blockStart");
                 PlayIdleAnimation(player, BlockStart);
             }
+            else if (buttonEvent->IsHeld()) {
+                Settings::_isCurrentlyBlocking = true;
+            }
 
-            if (buttonEvent->IsUp()) {
+            else if (buttonEvent->IsUp()) {
                 Settings::_isCurrentlyBlocking = false;
                 player->NotifyAnimationGraph("blockStop");
                 PlayIdleAnimation(player, BlockRelease);
                 
             }
-        }
+         }
 
         if (buttonEvent->IsDown()) {
             
             if (isAttackBtnPressed) {
 
-               if(player->NotifyAnimationGraph("MCO_EndAnimation")){
-                    logger::info("MCO_EndAnimation notified.");
-               }
+               player->NotifyAnimationGraph("MCO_EndAnimation");
 
                 player->GetGraphVariableInt("TDM_Dodge", isDodging);
                 player->GetGraphVariableInt("MCO_IsInRecovery", revocery);
-                
-                if (Dodge->conditions.IsTrue(player, player)) {
-                    player->NotifyAnimationGraph("attackStart");
-                }
+             
                 if (Settings::_isCurrentlyBlocking) {
                     if (currentStamina > 0) {
                             PlayIdleAnimation(player, BashStart);
@@ -270,19 +270,25 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                     return RE::BSEventNotifyControl::kContinue;  
                 }
                     if (SprintPower->conditions.IsTrue(player, player)) {
+                    logger::info("SprintPower condition is true.");
                         player->NotifyAnimationGraph("MCO_EndAnimation");
                         PlayIdleAnimation(player, SprintPower);
                     } else if (PowerBash->conditions.IsTrue(player, player)) {
                         player->NotifyAnimationGraph("MCO_EndAnimation");
                         PlayIdleAnimation(player, PowerBash);
                     } else if (PowerH2H->conditions.IsTrue(player, player)) {
+                        logger::info("PowerH2H condition is true.");
                         player->NotifyAnimationGraph("MCO_EndAnimation");
                         PlayIdleAnimation(player, PowerH2H);
                     } else {
                         player->NotifyAnimationGraph("MCO_EndAnimation");
                         player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 1);
-                        PlayIdleAnimation(player, PowerNormal);
-                        //PerformAction(PowerRight, player);
+                        if (player->Is3rdPersonVisible()) {
+                            PlayIdleAnimation(player, PowerNormal);
+                        } else {
+                            PerformAction(PowerRight, player);
+                        }
+                        
                     }
                 
             }
@@ -358,8 +364,6 @@ RE::BSEventNotifyControl GlobalControl::AnimationEventHandler::ProcessEvent(
             if (Settings::_isCurrentlyBlocking) {
                 player->NotifyAnimationGraph("blockStart");
             }
-        }else if (eventName == "MCO_IsInRecovery") {
-            logger::info("Animation Event: MCO_IsInRecovery received.");
         }
     }
     return RE::BSEventNotifyControl::kContinue;
