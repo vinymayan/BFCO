@@ -10,6 +10,8 @@ const std::string skyrim = "Skyrim.esm";
 const std::string update = "Update.esm";
 
 RE::BGSAction* PowerRight = nullptr;
+RE::BGSAction* Draw = nullptr;
+RE::BGSAction* Seath = nullptr;
 RE::BGSAction* PowerStanding = nullptr;
 RE::BGSAction* PowerLeft = nullptr;
 RE::BGSAction* PowerDual = nullptr;
@@ -135,6 +137,29 @@ void GetAttackKeys() {
     // leftAttackKeyGamepad = SKSE::InputMap::GamepadMaskToKeycode(leftAttackKeyGamepad);
 }
 
+bool IsLeftHandNotWeapon(RE::Actor* a_actor) {
+    if (!a_actor) {
+        return true;
+    }
+
+    // O argumento 'true' em GetEquippedObject pega a mão esquerda.
+    auto equippedObj = a_actor->GetEquippedObject(true);
+
+    // Se não houver objeto equipado (nullptr), a mão está vazia, logo não é arma.
+    if (!equippedObj) {
+        return true;
+    }
+
+    // Verifica se o tipo do formulário é Weapon (Arma).
+    // Se for Weapon, retorna false (porque queremos verificar se NÃO é uma arma).
+    if (equippedObj->GetFormType() == RE::FormType::Weapon) {
+        return false;
+    }
+
+    // Se chegou aqui, é porque é Escudo, Magia, Tocha ou outro item que não seja arma.
+    return true;
+}
+
 RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const* a_event,
                                                           RE::BSTEventSource<RE::InputEvent*>* a_source) {
     if (!a_event || !*a_event) {
@@ -199,11 +224,11 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
        
        
            
-        bool isStrong = false;
-        bool canAttack = false;
+        int isStrong = false;
+        int canAttack = false;
         bool hasCombo = false;
-        player->GetGraphVariableBool("BFCO_IsPlayerInputOK", canAttack);
-        player->GetGraphVariableBool("ADTF_ShouldDelay", isStrong);
+        player->GetGraphVariableInt("BFCO_IsPlayerInputOK", canAttack);
+        player->GetGraphVariableInt("ADTF_ShouldDelay", isStrong);
         float currentStamina = player->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina);
         auto* PowerNormal = GetIdleByFormID(0x8C5, pluginName);
         auto* PowerH2H = GetIdleByFormID(0x839, pluginName);
@@ -214,66 +239,102 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
         auto* BashStart = GetIdleByFormID(0x1B417, skyrim);
         auto* BashRelease = GetIdleByFormID(0x1457A, skyrim);
         auto* BlockRelease = GetIdleByFormID(0x13ACA, skyrim);
+        auto* Teste = GetIdleByFormID(0x13384, skyrim);
+        auto* Teste2 = GetIdleByFormID(0xE8456, skyrim);
         auto* Idle = GetActionByFormID(0x13002, skyrim);
         auto* Dodge = GetIdleByFormID(0x935, pluginName);
         int isDodging = 0;
         int revocery = 0;
 
+        
+     
          if (isBlockBtnPressed) {
-            if (buttonEvent->IsDown()) {
-                Settings::_isCurrentlyBlocking = true;
-                /*player->SetGraphVariableInt("BFCO_IsBlocking", 1);
-                player->SetGraphVariableBool("IsBlocking", true);*/
-                player->NotifyAnimationGraph("MCO_EndAnimation");
-                player->NotifyAnimationGraph("blockStart");
-                PlayIdleAnimation(player, BlockStart);
-            }
-            else if (buttonEvent->IsHeld()) {
-                Settings::_isCurrentlyBlocking = true;
-            }
+            if (Settings::disableDualblock) {
+                if (IsLeftHandNotWeapon(player)) {
+                    return RE::BSEventNotifyControl::kContinue;
+                } else {
+                    if (buttonEvent->IsDown()) {
+                        Settings::_isCurrentlyBlocking = true;
+                        player->NotifyAnimationGraph("MCO_EndAnimation");
+                        player->NotifyAnimationGraph("blockStart");
+                        PlayIdleAnimation(player, BlockStart);
+                    } else if (buttonEvent->IsHeld()) {
+                        Settings::_isCurrentlyBlocking = true;
+                    } else if (buttonEvent->IsUp()) {
+                        Settings::_isCurrentlyBlocking = false;
+                        player->NotifyAnimationGraph("blockStop");
+                        PlayIdleAnimation(player, BlockRelease);
+                    }
 
-            else if (buttonEvent->IsUp()) {
-                Settings::_isCurrentlyBlocking = false;
-                player->NotifyAnimationGraph("blockStop");
-                PlayIdleAnimation(player, BlockRelease);
-                
+                }
+
+            } else {
+                if (buttonEvent->IsDown()) {
+                    Settings::_isCurrentlyBlocking = true;
+                    /*player->SetGraphVariableInt("BFCO_IsBlocking", 1);
+                    player->SetGraphVariableBool("IsBlocking", true);*/
+                    player->NotifyAnimationGraph("MCO_EndAnimation");
+                    player->NotifyAnimationGraph("blockStart");
+                    PlayIdleAnimation(player, BlockStart);
+                } else if (buttonEvent->IsHeld()) {
+                    Settings::_isCurrentlyBlocking = true;
+                }
+
+                else if (buttonEvent->IsUp()) {
+                    Settings::_isCurrentlyBlocking = false;
+                    player->NotifyAnimationGraph("blockStop");
+                    PlayIdleAnimation(player, BlockRelease);
+                }
+
             }
+            
          }
 
         if (buttonEvent->IsDown()) {
-            
+             player->GetGraphVariableInt("TDM_Dodge", isDodging);
+             player->GetGraphVariableInt("MCO_IsInRecovery", revocery);
             if (isAttackBtnPressed) {
 
                player->NotifyAnimationGraph("MCO_EndAnimation");
 
-                player->GetGraphVariableInt("TDM_Dodge", isDodging);
-                player->GetGraphVariableInt("MCO_IsInRecovery", revocery);
-             
-                if (Settings::_isCurrentlyBlocking) {
-                    if (currentStamina > 0) {
-                            PlayIdleAnimation(player, BashStart);
-                    } else {
-                        player->NotifyAnimationGraph("bashFail");
-                    }
-                    
-                }
-                else if (canAttack) {
+               if (Settings::bPowerAttackLMB) {
+                   player->SetGraphVariableInt("NEW_BFCO_DisablePALMB", 1);
+               }
+
+               if (Settings::_isCurrentlyBlocking) {
+                 if (Settings::disableMStaBash) {
+                   Settings::_isCurrentlyBlocking = false;
+                   player->SetGraphVariableBool("IsBlocking", false);
+                   player->SetGraphVariableInt("BFCO_IsBlocking", 0);
+                   player->NotifyAnimationGraph("blockStop");
+                   PerformAction(NormalAttack, player);
+                 } else {
+                       if (currentStamina > 0) {
+                           PlayIdleAnimation(player, BashStart);
+                       } else {
+                           player->NotifyAnimationGraph("bashFail");
+                       }
+                 } 
+               }
+                
+                if (canAttack == 1) {
                     player->SetGraphVariableInt("NEW_BFCO_IsNormalAttacking", 1);  
                 }
-                else if (isStrong) {
+                else if (isStrong == 1) {
                     player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 1);
                 }
             }
-
-            if (isPowerAttackKeyPressed) {
-                if (currentStamina <= 0) {
-                    return RE::BSEventNotifyControl::kContinue;  
-                }
+            if (Settings::bEnablePowerAttack) {
+                if (isPowerAttackKeyPressed) {
+                    if (currentStamina <= 0) {
+                        return RE::BSEventNotifyControl::kContinue;
+                    }
                     if (SprintPower->conditions.IsTrue(player, player)) {
-                    logger::info("SprintPower condition is true.");
+                        logger::info("SprintPower condition is true.");
                         player->NotifyAnimationGraph("MCO_EndAnimation");
                         PlayIdleAnimation(player, SprintPower);
-                    } else if (PowerBash->conditions.IsTrue(player, player)) {
+                    } else if (!Settings::disableMStaBash && PowerBash->conditions.IsTrue(player, player)) {
+                        logger::info("PowerBash condition is true.");
                         player->NotifyAnimationGraph("MCO_EndAnimation");
                         PlayIdleAnimation(player, PowerBash);
                     } else if (PowerH2H->conditions.IsTrue(player, player)) {
@@ -281,17 +342,33 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                         player->NotifyAnimationGraph("MCO_EndAnimation");
                         PlayIdleAnimation(player, PowerH2H);
                     } else {
-                        player->NotifyAnimationGraph("MCO_EndAnimation");
+                        if (Dodge->conditions.IsTrue(player, player)) {
+                            logger::info("Dodge condition is true.");
+                            player->NotifyAnimationGraph("MCO_EndAnimation");
+                            PlayIdleAnimation(player, Dodge);
+                        }
+                        //logger::info("strong {}, canAttack {}", isStrong, canAttack);
                         player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 1);
+                        player->SetGraphVariableInt("NEW_BFCO_DisablePALMB", 0);
                         if (player->Is3rdPersonVisible()) {
-                            PlayIdleAnimation(player, PowerNormal);
+                            if (!Settings::DodgeCancel) {
+                                player->NotifyAnimationGraph("MCO_EndAnimation");
+                                Settings::DodgeCancel = false;
+                            }
+                            
+                           
+                            //player->NotifyAnimationGraph("attackPowerStartForward");
+                            //player->NotifyAnimationGraph("attackstart");
+                            //player->NotifyAnimationGraph("BFCO_DefWinStart");
+                            PerformAction(PowerRight, player);
+                            //PlayIdleAnimation(player, Teste2);
                         } else {
                             PerformAction(PowerRight, player);
                         }
-                        
                     }
-                
+                }
             }
+            
             if (Settings::bEnableComboAttack) {
                 if (comboKeyPressed) {
                     
@@ -307,28 +384,24 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                                 PlayIdleAnimation(player, SprintPower);
                             } else if (PowerBash->conditions.IsTrue(player, player)) {
                                 PlayIdleAnimation(player, PowerBash);
-                            } else if (PowerH2H->conditions.IsTrue(player, player)) {
-                                 PlayIdleAnimation(player, PowerH2H);
                             } else {
                                 player->NotifyAnimationGraph("BFCOAttackStart_Comb");
                                 PlayIdleAnimation(player, ComboAttackE);
                             }
-                            
+
                         } else {
                             player->NotifyAnimationGraph("MCO_EndAnimation");
                             PerformAction(PowerRight, player);
                         }
                         return RE::BSEventNotifyControl::kContinue;
-                    } else if (SprintPower->conditions.IsTrue(player, player)) {
+                    }
+                    else if(SprintPower->conditions.IsTrue(player, player)) {
                         player->NotifyAnimationGraph("MCO_EndAnimation");
                         PlayIdleAnimation(player, SprintPower);
                     } else if (PowerBash->conditions.IsTrue(player, player)) {
                         player->NotifyAnimationGraph("MCO_EndAnimation");
                         PlayIdleAnimation(player, PowerBash);
-                    } else if (PowerH2H->conditions.IsTrue(player, player)) {
-                        player->NotifyAnimationGraph("MCO_EndAnimation");
-                        PlayIdleAnimation(player, PowerH2H);
-                    } else {
+                    }  else {
                         player->NotifyAnimationGraph("MCO_EndAnimation");
                         player->NotifyAnimationGraph("BFCOAttackStart_Comb");
                         PlayIdleAnimation(player, ComboAttackE);
@@ -339,8 +412,11 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
         } 
 
         if (buttonEvent->IsUp()) {
-            if (isPowerAttackKeyPressed) {
-                player->NotifyAnimationGraph("BFCOAttackstart_1");
+            if (Settings::bEnablePowerAttack) {
+                if (isPowerAttackKeyPressed) {
+                    logger::info("Power Attack Key Released");
+                    player->NotifyAnimationGraph("BFCOAttackstart_1");
+                }
             }
         }
     }
@@ -351,9 +427,9 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
 RE::BSEventNotifyControl GlobalControl::AnimationEventHandler::ProcessEvent(
     const RE::BSAnimationGraphEvent* a_event, RE::BSTEventSource<RE::BSAnimationGraphEvent>*) {
     auto player = RE::PlayerCharacter::GetSingleton();
-
+    const std::string_view eventName = a_event->tag;
     if (a_event && a_event->holder && a_event->holder->IsPlayerRef()) {
-        const std::string_view eventName = a_event->tag;
+        
        
         if (eventName == "Bfco_AttackStartFX") {
             player->SetGraphVariableInt("NEW_BFCO_IsNormalAttacking", 0);
@@ -364,7 +440,10 @@ RE::BSEventNotifyControl GlobalControl::AnimationEventHandler::ProcessEvent(
             if (Settings::_isCurrentlyBlocking) {
                 player->NotifyAnimationGraph("blockStart");
             }
+        }else if (eventName == "MCO_DodgeOpen") {
+            Settings::DodgeCancel = true;
         }
     }
+    
     return RE::BSEventNotifyControl::kContinue;
 }

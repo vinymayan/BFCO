@@ -6,8 +6,11 @@
 namespace Settings {
     // Checkboxes (baseado no seu MCM)
     inline bool _isCurrentlyBlocking = false;
+    inline bool DodgeCancel = false;
+    inline bool CanPA = false;
     inline bool bEnableComboAttack = true;
     inline bool bEnableDirectionalAttack = true;
+    inline bool bEnablePowerAttack = true;
     //inline bool bEnableLmbPowerAttack = false;
     //inline bool bEnableRmbPowerAttack = false;
     inline bool bDisableJumpingAttack = false;
@@ -31,6 +34,7 @@ namespace Settings {
     inline bool hasCMF = false;
     inline bool lockSprintAttack = false;
     inline bool disableMStaBash = false;
+    inline bool disableDualblock = false;
 }
 
 // Namespace para organizar as funções do nosso menu
@@ -50,7 +54,7 @@ namespace BFCOMenu {
 
 
 const std::map<int, const char*> g_gamepad_dx_to_name_map = {
-    // --- GAMEPAD (ATUALIZADO) ---
+    {0, "[Nenhuma]"},
     {1, "DPad Up"},
     {2, "DPad Down"},
     {4, "DPad Left"},

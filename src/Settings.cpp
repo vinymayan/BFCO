@@ -90,7 +90,7 @@ namespace BFCOMenu {
         ImGui::Separator();
         ImGui::Spacing();
 
-        if (ImGui::Checkbox("Enable Combo attack", &Settings::bEnableComboAttack)) settings_changed = true;
+        if (ImGui::Checkbox("Enable combo attack", &Settings::bEnableComboAttack)) settings_changed = true;
         RenderKeybind("Combo Attack key", &Settings::comboKey_k, &Settings::comboKey_m, &Settings::comboKey_g);
 
         ImGui::Spacing();
@@ -98,6 +98,7 @@ namespace BFCOMenu {
         ImGui::Spacing();
 
         if (ImGui::Checkbox("Enable direcional power attack", &Settings::bEnableDirectionalAttack)) settings_changed = true;
+        if (ImGui::Checkbox("Enable power attack key", &Settings::bEnablePowerAttack)) settings_changed = true;
         RenderKeybind("Power Attack Key", &Settings::PowerAttackKey_k, &Settings::PowerAttackKey_m,
                       &Settings::PowerAttackKey_g);
 
@@ -116,7 +117,8 @@ namespace BFCOMenu {
             settings_changed = true;
         if (ImGui::Checkbox("Ativar Ataque Carregado (Clique Direito)", &Settings::bEnableRmbPowerAttack))
             settings_changed = true;*/
-        //if (ImGui::Checkbox("Disable bash when lo", &Settings::disableMStaBash)) settings_changed = true;
+        if (ImGui::Checkbox("Disable bash in block key (Beta)", &Settings::disableMStaBash)) settings_changed = true;
+        if (ImGui::Checkbox("Disable block non weapon in left in block key", &Settings::disableDualblock)) settings_changed = true;
         if (ImGui::Checkbox("Disable jump attack (Beta)", &Settings::bDisableJumpingAttack)) settings_changed = true;
         if (ImGui::Checkbox("Disable power attack LMB (Beta)", &Settings::bPowerAttackLMB)) settings_changed = true;
         //if (ImGui::Checkbox("Lock sprint attack behind perk", &Settings::lockSprintAttack)) settings_changed = true;
@@ -139,11 +141,7 @@ namespace BFCOMenu {
             {"bfcoTG_KeyAttackComb", Settings::bEnableComboAttack ? 1.0f : 0.0f},
             {"bfcoINT_KeyAttackComb", Settings::bEnableComboAttack ? 2.0f : 0.0f},
             {"bfcoDebug_DisJumpAttack", Settings::bDisableJumpingAttack ? 1.0f : 0.0f},
-            //{"BFCO_StrongAttackIsOK", 1.0f },
-            //{"BFCO_NormalAttackIsOK", 1.0f },
-            //{"BFCO_Global_ComboKey",static_cast<float>(Settings::comboKey_k)},  // Supondo que o script use o valor do teclado
             {"bfcoTG_DirPowerAttack", Settings::bEnableDirectionalAttack ? 1.0f : 0.0f},
-            // Adicione outras Globals aqui conforme o MCM original
             {"bfcoTG_LmbPowerAttackNUM", Settings::bPowerAttackLMB ? 0.0f : 1.0f},
             {"bfcoTG_RmbPowerAttackNUM", Settings::PowerAttackKey_m == 257 ? 1.0f : 0.0f}
         };
@@ -186,11 +184,13 @@ namespace BFCOMenu {
         //doc.AddMember("AttackKey_m", Settings::AttackKey_m, allocator);
         //doc.AddMember("AttackKey_g", Settings::AttackKey_g, allocator);
 
-        /*doc.AddMember("bEnableLmbPowerAttack", Settings::bEnableLmbPowerAttack, allocator);
-        doc.AddMember("bEnableRmbPowerAttack", Settings::bEnableRmbPowerAttack, allocator);*/
+
+        doc.AddMember("bEnablePowerAttack", Settings::bEnablePowerAttack, allocator);
         doc.AddMember("bDisableJumpingAttack", Settings::bDisableJumpingAttack, allocator);
         doc.AddMember("bPowerAttackLMB", Settings::bPowerAttackLMB, allocator);
         doc.AddMember("lockSprintAttack", Settings::lockSprintAttack, allocator);
+        doc.AddMember("disableMStaBash", Settings::disableMStaBash, allocator);
+        doc.AddMember("disableDualblock", Settings::disableDualblock, allocator);
 
         FILE* fp = nullptr;
         fopen_s(&fp, SETTINGS_PATH, "wb");
@@ -251,16 +251,18 @@ namespace BFCOMenu {
                 //if (doc.HasMember("AttackKey_g") && doc["AttackKey_g"].IsInt())
                 //    Settings::AttackKey_g = doc["AttackKey_g"].GetInt();
 
-                /*if (doc.HasMember("bEnableLmbPowerAttack") && doc["bEnableLmbPowerAttack"].IsBool())
-                    Settings::bEnableLmbPowerAttack = doc["bEnableLmbPowerAttack"].GetBool();
-                if (doc.HasMember("bEnableRmbPowerAttack") && doc["bEnableRmbPowerAttack"].IsBool())
-                    Settings::bEnableRmbPowerAttack = doc["bEnableRmbPowerAttack"].GetBool();*/
+                if (doc.HasMember("bEnablePowerAttack") && doc["bEnablePowerAttack"].IsBool())
+                    Settings::bEnablePowerAttack = doc["bEnablePowerAttack"].GetBool();
                 if (doc.HasMember("bDisableJumpingAttack") && doc["bDisableJumpingAttack"].IsBool())
                     Settings::bDisableJumpingAttack = doc["bDisableJumpingAttack"].GetBool();
                 if (doc.HasMember("bPowerAttackLMB") && doc["bPowerAttackLMB"].IsBool())
                     Settings::bPowerAttackLMB = doc["bPowerAttackLMB"].GetBool();
                 if (doc.HasMember("lockSprintAttack") && doc["lockSprintAttack"].IsBool())
                     Settings::lockSprintAttack = doc["lockSprintAttack"].GetBool();
+                if (doc.HasMember("disableMStaBash") && doc["disableMStaBash"].IsBool())
+                    Settings::disableMStaBash = doc["disableMStaBash"].GetBool();
+                if (doc.HasMember("disableDualblock") && doc["disableDualblock"].IsBool())
+                    Settings::disableDualblock = doc["disableDualblock"].GetBool();
             }
         }
         // Após carregar, sempre atualize as Globals do jogo
@@ -271,9 +273,6 @@ namespace BFCOMenu {
     void Register() {
         if (SKSEMenuFramework::IsInstalled()) {
             SKSE::log::info("SKSE Menu Framework encontrado. Registrando o menu BFCO.");
-
-            // Carrega as configurações do arquivo ao iniciar
-           
 
             SKSEMenuFramework::SetSection("BFCO");
             SKSEMenuFramework::AddSectionItem("Settings", Render);

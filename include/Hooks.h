@@ -48,6 +48,8 @@ private:
 
 
 extern RE::BGSAction* PowerRight;
+extern RE::BGSAction* Draw;
+extern RE::BGSAction* Seath;
 extern RE::BGSAction* PowerStanding;
 extern RE::BGSAction* PowerLeft;
 extern RE::BGSAction* PowerDual;

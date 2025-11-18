@@ -15,6 +15,8 @@ void OnMessage(SKSE::MessagingInterface::Message* msg) {
             AttackStateManager::GetSingleton()->Register();
             SKSE::log::info("Evento kDataLoaded recebido. Procurando BGSAction...");
             PowerRight = RE::TESForm::LookupByID<RE::BGSAction>(0x13383);
+            Draw = RE::TESForm::LookupByID<RE::BGSAction>(0x132AF);
+            Seath = RE::TESForm::LookupByID<RE::BGSAction>(0x46BAF);
             PowerStanding = RE::TESForm::LookupByID<RE::BGSAction>(0x19B26);
             PowerLeft = RE::TESForm::LookupByID<RE::BGSAction>(0x2E2F6);
             PowerDual = RE::TESForm::LookupByID<RE::BGSAction>(0x2E2F7);
