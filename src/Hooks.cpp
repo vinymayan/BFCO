@@ -350,21 +350,19 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                         //logger::info("strong {}, canAttack {}", isStrong, canAttack);
                         player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 1);
                         player->SetGraphVariableInt("NEW_BFCO_DisablePALMB", 0);
-                        if (player->Is3rdPersonVisible()) {
+                        
                             if (!Settings::DodgeCancel) {
                                 player->NotifyAnimationGraph("MCO_EndAnimation");
                                 Settings::DodgeCancel = false;
                             }
+                            if (Settings::bEnableDirectionalAttack) {
+                                PerformAction(PowerRight, player);
+                            } else {
+                                PlayIdleAnimation(player, PowerNormal);
+                            }
                             
-                           
-                            //player->NotifyAnimationGraph("attackPowerStartForward");
-                            //player->NotifyAnimationGraph("attackstart");
-                            //player->NotifyAnimationGraph("BFCO_DefWinStart");
-                            PerformAction(PowerRight, player);
-                            //PlayIdleAnimation(player, Teste2);
-                        } else {
-                            PerformAction(PowerRight, player);
-                        }
+
+                         
                     }
                 }
             }
