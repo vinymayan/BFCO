@@ -300,35 +300,50 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                if (Settings::bPowerAttackLMB) {
                    player->SetGraphVariableInt("NEW_BFCO_DisablePALMB", 1);
                }
-
                if (Settings::_isCurrentlyBlocking) {
-                 if (Settings::disableMStaBash) {
-                   Settings::_isCurrentlyBlocking = false;
-                   player->SetGraphVariableBool("IsBlocking", false);
-                   player->SetGraphVariableInt("BFCO_IsBlocking", 0);
-                   player->NotifyAnimationGraph("blockStop");
-                   PerformAction(NormalAttack, player);
-                 } else {
+                   if (Settings::disableMStaBash) {
+                       Settings::_isCurrentlyBlocking = false;
+                       player->SetGraphVariableBool("IsBlocking", false);
+                       player->SetGraphVariableInt("BFCO_IsBlocking", 0);
+                       player->NotifyAnimationGraph("blockStop");
+                       PerformAction(NormalAttack, player);
+                   }
+                   else {
                        if (currentStamina > 0) {
                            PlayIdleAnimation(player, BashStart);
-                       } else {
+                       }
+                       else {
                            player->NotifyAnimationGraph("bashFail");
                        }
-                 } 
+                   }
                }
+               if (canAttack == 1) {
+                   player->SetGraphVariableInt("NEW_BFCO_IsNormalAttacking", 1);
+               }
+               else if (isStrong == 1) {
+                   if (Settings::bPowerAttackLMB) {
+                       player->SetGraphVariableInt("NEW_BFCO_IsNormalAttacking", 1);
+                       PerformAction(NormalAttack, player);
+                   }
+                   else {
+                       player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 1);
+                   }
+                   
+               }
+               
                 
-                if (canAttack == 1) {
-                    player->SetGraphVariableInt("NEW_BFCO_IsNormalAttacking", 1);  
-                }
-                else if (isStrong == 1) {
-                    player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 1);
-                }
             }
             if (Settings::bEnablePowerAttack) {
                 if (isPowerAttackKeyPressed) {
                     if (currentStamina <= 0) {
                         return RE::BSEventNotifyControl::kContinue;
                     }
+                    if (Settings::PowerAttackKey_m == 257) {
+                        if (IsLeftHandNotWeapon(player)) {
+                            return RE::BSEventNotifyControl::kContinue;
+                        }
+                    }
+
                     if (SprintPower->conditions.IsTrue(player, player)) {
                         logger::info("SprintPower condition is true.");
                         player->NotifyAnimationGraph("MCO_EndAnimation");
@@ -360,8 +375,6 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                             } else {
                                 PlayIdleAnimation(player, PowerNormal);
                             }
-                            
-
                          
                     }
                 }
@@ -407,6 +420,7 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                     
                 }
             } 
+            
         } 
 
         if (buttonEvent->IsUp()) {
@@ -417,6 +431,7 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                 }
             }
         }
+
     }
     return RE::BSEventNotifyControl::kContinue;
 }

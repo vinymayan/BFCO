@@ -98,6 +98,11 @@ namespace BFCOMenu {
         ImGui::Spacing();
 
         if (ImGui::Checkbox("Enable direcional power attack", &Settings::bEnableDirectionalAttack)) settings_changed = true;
+        ImGui::SameLine();
+        ImGui::TextDisabled("(?)");
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Recommend disable, only enable if you use native BFCO animations");  // Tooltip explicando as 3 opções
+        }
         if (ImGui::Checkbox("Enable power attack key", &Settings::bEnablePowerAttack)) settings_changed = true;
         RenderKeybind("Power Attack Key", &Settings::PowerAttackKey_k, &Settings::PowerAttackKey_m,
                       &Settings::PowerAttackKey_g);
