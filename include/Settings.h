@@ -9,28 +9,54 @@ namespace Settings {
     inline bool DodgeCancel = false;
     inline bool CanPA = false;
     inline bool bEnableComboAttack = true;
-    inline bool bEnableDirectionalAttack = true;
+    inline bool bEnableDirectionalAttack = false;
     inline bool bEnablePowerAttack = true;
     //inline bool bEnableLmbPowerAttack = false;
     //inline bool bEnableRmbPowerAttack = false;
     inline bool bDisableJumpingAttack = false;
-    inline bool bPowerAttackLMB = false;
+    inline int bPowerAttackLMB = 0;
+    inline bool bAutoAA = true;
 
     // Keybinds (separados para teclado e controle)
     // Os valores padrão podem ser ajustados conforme necessário. Usei códigos de tecla comuns.
-    inline uint32_t comboKey_k = 47;  // Teclado (V)
-    inline uint32_t comboKey_m = 0;      
-    inline uint32_t comboKey_g = 265;  // Controle (RB / R1)
+    inline uint32_t comboKey_k = 47;  // V
+    inline uint32_t comboKey_k_mod = 0; // Modificador (Ex: Ctrl)
 
-    inline uint32_t PowerAttackKey_k = 18;  // Teclado (E)
-    inline uint32_t PowerAttackKey_m = 0;      
-    inline uint32_t PowerAttackKey_g = 512;  // Controle (LB / L1)
-    inline uint32_t BlockKey_k = -1;       // Teclado (E)
-    inline uint32_t BlockKey_m = -3;      
-    inline uint32_t BlockKey_g = -2;  // Controle (LB / L1)
-    inline uint32_t AttackKey_k = -1;       // Teclado (E)
-    inline uint32_t AttackKey_m = -3;      
-    inline uint32_t AttackKey_g = -2;  // Controle (LB / L1)
+    inline uint32_t comboKey_m = 0;
+    inline uint32_t comboKey_m_mod = 0;
+
+    inline uint32_t comboKey_g = 265;  // RB / R1
+    inline uint32_t comboKey_g_mod = 0;
+
+    // Power Attack
+    inline uint32_t PowerAttackKey_k = 18;  // E
+    inline uint32_t PowerAttackKey_k_mod = 0;
+
+    inline uint32_t PowerAttackKey_m = 0;
+    inline uint32_t PowerAttackKey_m_mod = 0;
+
+    inline uint32_t PowerAttackKey_g = 512;  // LB / L1
+    inline uint32_t PowerAttackKey_g_mod = 0;
+
+    // Block
+    inline uint32_t BlockKey_k = -1;
+    inline uint32_t BlockKey_k_mod = 0;
+
+    inline uint32_t BlockKey_m = -3;
+    inline uint32_t BlockKey_m_mod = 0;
+
+    inline uint32_t BlockKey_g = -2;
+    inline uint32_t BlockKey_g_mod = 0;
+
+    // Attack (Se precisar no futuro)
+    inline uint32_t AttackKey_k = -1;
+    inline uint32_t AttackKey_m = -3;
+    inline uint32_t AttackKey_g = -2;
+
+    inline uint32_t AttackKeyLeft_k = -1;
+    inline uint32_t AttackKeyLeft_m = -3;
+    inline uint32_t AttackKeyLeft_g = -2;
+
     inline bool hasCMF = false;
     inline bool lockSprintAttack = false;
     inline bool disableMStaBash = false;
@@ -152,7 +178,7 @@ const std::map<int, const char*> g_dx_to_name_map = {
     {209, "PgDown"},
     {210, "Insert"},
     {211, "Delete"},
-    //{256, "Left Click"},
+    {256, "Left Click"},
     {257, "Right Click"},
     {258, "Middle Mouse Button"},
     {259, "Mouse 4"},

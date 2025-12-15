@@ -30,11 +30,9 @@ void OnMessage(SKSE::MessagingInterface::Message* msg) {
     if (msg->type == SKSE::MessagingInterface::kNewGame || msg->type == SKSE::MessagingInterface::kPostLoadGame) {
         BFCOMenu::UpdateGameGlobals();
         GetAttackKeys();
-        auto* animationEventSource = RE::PlayerCharacter::GetSingleton();
-        if (animationEventSource) {
-            animationEventSource->AddAnimationGraphEventSink(GlobalControl::AnimationEventHandler::GetSingleton());
-            SKSE::log::info("AnimationEventHandler registrado com sucesso.");
-        }
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        player->AddAnimationGraphEventSink(GlobalControl::AnimationEventHandler::GetSingleton());
+        RE::ScriptEventSourceHolder::GetSingleton()->AddEventSink(GlobalControl::PC3DLoadEventHandler::GetSingleton());
     }
 }
 

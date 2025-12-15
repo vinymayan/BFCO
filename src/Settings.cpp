@@ -12,70 +12,106 @@ namespace BFCOMenu {
 
     // Função auxiliar para criar um seletor de teclas (ComboBox)
     // Baseado no seu exemplo Events.cpp
-    void RenderKeybind(const char* label, uint32_t* key_k, uint32_t* key_m, uint32_t* key_g, bool mouse_only = false) {
+    void RenderKeybind(const char* label,
+        uint32_t* key_k, uint32_t* key_k_mod,
+        uint32_t* key_m, uint32_t* key_m_mod,
+        uint32_t* key_g, uint32_t* key_g_mod,
+        bool mouse_only = false) {
+
         bool settings_changed = false;
 
-        // --- DROPDOWN UNIFICADO PARA TECLADO E MOUSE ---
         ImGui::Text("%s (PC)", label);
         ImGui::SameLine();
 
-        // 1. Descobre qual tecla (teclado ou mouse) está atualmente selecionada.
+        // --- PC (Keyboard/Mouse) ---
         uint32_t current_pc_key = (*key_k != 0) ? *key_k : *key_m;
+        uint32_t current_pc_mod = (*key_k != 0) ? *key_k_mod : *key_m_mod; // Pega o mod correspondente
 
-        // 2. Busca o nome da tecla atual para exibir no dropdown fechado.
         const char* current_key_name_pc = "[Nenhuma]";
-        auto it_pc = g_dx_to_name_map.find(current_pc_key);
-        if (it_pc != g_dx_to_name_map.end()) {
-            current_key_name_pc = it_pc->second;
-        }
+        if (auto it = g_dx_to_name_map.find(current_pc_key); it != g_dx_to_name_map.end()) current_key_name_pc = it->second;
 
-        // 3. Cria o ComboBox.
-        if (ImGui::BeginCombo((std::string("##_pc_") + label).c_str(), current_key_name_pc)) {
-            // Itera por TODAS as teclas (teclado e mouse) no mapa.
+        // Combo Principal
+        ImGui::PushID(label); // Evita colisão de IDs no ImGui
+        ImGui::SetNextItemWidth(200);
+        if (ImGui::BeginCombo("##Key", current_key_name_pc)) {
             for (auto const& [key_code, key_name] : g_dx_to_name_map) {
                 if (mouse_only && key_code < 256) continue;
-                const bool is_selected = (current_pc_key == key_code);
-                if (ImGui::Selectable(key_name, is_selected)) {
-                    // 4. LÓGICA DE EXCLUSÃO MÚTUA
-                    // Se a tecla selecionada for do teclado (< 256)...
+                if (ImGui::Selectable(key_name, current_pc_key == key_code)) {
                     if (key_code < 256) {
-                        *key_k = key_code;  // Define a tecla do teclado.
-                        *key_m = 0;         // Limpa a tecla do mouse.
-                    } else {                // Senão, é uma tecla do mouse.
-                        *key_m = key_code;  // Define a tecla do mouse.
-                        *key_k = 0;         // Limpa a tecla do teclado.
+                        *key_k = key_code; *key_m = 0;
+                        // Reseta o mod do mouse se mudou para teclado
+                        *key_m_mod = 0;
+                    }
+                    else {
+                        *key_m = key_code; *key_k = 0;
+                        // Reseta o mod do teclado se mudou para mouse
+                        *key_k_mod = 0;
                     }
                     settings_changed = true;
                 }
-                if (is_selected) {
-                    ImGui::SetItemDefaultFocus();
-                }
             }
             ImGui::EndCombo();
         }
 
-        // --- CONTROLE ---
-        const char* current_key_name_g = "[Nenhuma]";  // Valor padrão
-        auto it_g = g_gamepad_dx_to_name_map.find(*key_g);
-        if (it_g != g_gamepad_dx_to_name_map.end()) {
-            current_key_name_g = it_g->second;
+        ImGui::SameLine();
+        ImGui::Text("+");
+        ImGui::SameLine();
+
+        // Combo Modificador
+        const char* current_mod_name_pc = "[Nenhuma]";
+        if (auto it = g_dx_to_name_map.find(current_pc_mod); it != g_dx_to_name_map.end()) current_mod_name_pc = it->second;
+
+        ImGui::SetNextItemWidth(200);
+        if (ImGui::BeginCombo("##Mod", current_mod_name_pc)) {
+            for (auto const& [key_code, key_name] : g_dx_to_name_map) {
+                // Modificador pode ser qualquer tecla
+                if (ImGui::Selectable(key_name, current_pc_mod == key_code)) {
+                    if (*key_k != 0) *key_k_mod = key_code;
+                    else if (*key_m != 0) *key_m_mod = key_code;
+                    settings_changed = true;
+                }
+            }
+            ImGui::EndCombo();
         }
+        ImGui::PopID();
+
+        // --- GAMEPAD ---
+        const char* current_key_name_g = "[Nenhuma]";
+        if (auto it = g_gamepad_dx_to_name_map.find(*key_g); it != g_gamepad_dx_to_name_map.end()) current_key_name_g = it->second;
+
+        const char* current_mod_name_g = "[Nenhuma]";
+        if (auto it = g_gamepad_dx_to_name_map.find(*key_g_mod); it != g_gamepad_dx_to_name_map.end()) current_mod_name_g = it->second;
 
         ImGui::Text("%s (Gamepad)", label);
         ImGui::SameLine();
-        if (ImGui::BeginCombo((std::string("##_g_") + label).c_str(), current_key_name_g)) {
+
+        ImGui::PushID((std::string(label) + "_g").c_str());
+        ImGui::SetNextItemWidth(200);
+        if (ImGui::BeginCombo("##KeyG", current_key_name_g)) {
             for (auto const& [key_code, key_name] : g_gamepad_dx_to_name_map) {
-                const bool is_selected = (*key_g == key_code);
-                if (ImGui::Selectable(key_name, is_selected)) {
+                if (ImGui::Selectable(key_name, *key_g == key_code)) {
                     *key_g = key_code;
                     settings_changed = true;
-                }
-                if (is_selected) {
-                    ImGui::SetItemDefaultFocus();
                 }
             }
             ImGui::EndCombo();
         }
+
+        ImGui::SameLine();
+        ImGui::Text("+");
+        ImGui::SameLine();
+
+        ImGui::SetNextItemWidth(200);
+        if (ImGui::BeginCombo("##ModG", current_mod_name_g)) {
+            for (auto const& [key_code, key_name] : g_gamepad_dx_to_name_map) {
+                if (ImGui::Selectable(key_name, *key_g_mod == key_code)) {
+                    *key_g_mod = key_code;
+                    settings_changed = true;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::PopID();
 
         if (settings_changed) {
             SaveSettings();
@@ -91,7 +127,11 @@ namespace BFCOMenu {
         ImGui::Spacing();
 
         if (ImGui::Checkbox("Enable combo attack", &Settings::bEnableComboAttack)) settings_changed = true;
-        RenderKeybind("Combo Attack key", &Settings::comboKey_k, &Settings::comboKey_m, &Settings::comboKey_g);
+
+        RenderKeybind("Combo Attack",
+            &Settings::comboKey_k, &Settings::comboKey_k_mod,
+            &Settings::comboKey_m, &Settings::comboKey_m_mod,
+            &Settings::comboKey_g, &Settings::comboKey_g_mod);
 
         ImGui::Spacing();
         ImGui::Separator();
@@ -101,32 +141,58 @@ namespace BFCOMenu {
         ImGui::SameLine();
         ImGui::TextDisabled("(?)");
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Recommend disable, only enable if you use native BFCO animations");  // Tooltip explicando as 3 opções
+            ImGui::SetTooltip("Recommend disable, only enable if you use native BFCO animations");
         }
         if (ImGui::Checkbox("Enable power attack key", &Settings::bEnablePowerAttack)) settings_changed = true;
-        RenderKeybind("Power Attack Key", &Settings::PowerAttackKey_k, &Settings::PowerAttackKey_m,
-                      &Settings::PowerAttackKey_g);
+
+        RenderKeybind("Power Attack",
+            &Settings::PowerAttackKey_k, &Settings::PowerAttackKey_k_mod,
+            &Settings::PowerAttackKey_m, &Settings::PowerAttackKey_m_mod,
+            &Settings::PowerAttackKey_g, &Settings::PowerAttackKey_g_mod);
 
         ImGui::Spacing();
         ImGui::Separator();
         ImGui::Spacing();
 
-
-        RenderKeybind("Block Key (Beta)", &Settings::BlockKey_k, &Settings::BlockKey_m, &Settings::BlockKey_g);
+        RenderKeybind("Block Key (Beta)",
+            &Settings::BlockKey_k, &Settings::BlockKey_k_mod,
+            &Settings::BlockKey_m, &Settings::BlockKey_m_mod,
+            &Settings::BlockKey_g, &Settings::BlockKey_g_mod);
 
         ImGui::Spacing();
         ImGui::Separator();
         ImGui::Spacing();
+        ImGui::Text("Light Attack"); // Nova Categoria
+        ImGui::Spacing();
 
-        /*if (ImGui::Checkbox("Ativar Ataque Carregado (Clique Esquerdo)", &Settings::bEnableLmbPowerAttack))
-            settings_changed = true;
-        if (ImGui::Checkbox("Ativar Ataque Carregado (Clique Direito)", &Settings::bEnableRmbPowerAttack))
-            settings_changed = true;*/
+        // Dropdown para bPowerAttackLMB
+        const char* items[] = { "Vanilla", "Disable PA", "Auto Mode" };
+        const char* current_item = (Settings::bPowerAttackLMB >= 0 && Settings::bPowerAttackLMB < 3) ? items[Settings::bPowerAttackLMB] : items[0];
+
+        ImGui::SetNextItemWidth(200);
+        if (ImGui::BeginCombo("Light Attack Mode", current_item)) {
+            for (int n = 0; n < sizeof(items) / sizeof(items[0]); n++) {
+                bool is_selected = (Settings::bPowerAttackLMB == n);
+                if (ImGui::Selectable(items[n], is_selected)) {
+                    Settings::bPowerAttackLMB = n;
+                    settings_changed = true;
+                }
+                if (is_selected) {
+                    ImGui::SetItemDefaultFocus();
+                }
+            }
+            ImGui::EndCombo();
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Vanilla: Default behavior\nDisable PA: Disables Power Attack on click\nAuto Mode: Holds attack for combos automatically");
+        }
+
+        
+        ImGui::Spacing();
+        ImGui::Separator();
         if (ImGui::Checkbox("Disable bash in block key (Beta)", &Settings::disableMStaBash)) settings_changed = true;
         if (ImGui::Checkbox("Disable block non weapon in left in block key", &Settings::disableDualblock)) settings_changed = true;
         if (ImGui::Checkbox("Disable jump attack (Beta)", &Settings::bDisableJumpingAttack)) settings_changed = true;
-        if (ImGui::Checkbox("Disable power attack LMB (Beta)", &Settings::bPowerAttackLMB)) settings_changed = true;
-        //if (ImGui::Checkbox("Lock sprint attack behind perk", &Settings::lockSprintAttack)) settings_changed = true;
 
         if (settings_changed) {
             SaveSettings();
@@ -147,8 +213,8 @@ namespace BFCOMenu {
             {"bfcoINT_KeyAttackComb", Settings::bEnableComboAttack ? 2.0f : 0.0f},
             {"bfcoDebug_DisJumpAttack", Settings::bDisableJumpingAttack ? 1.0f : 0.0f},
             {"bfcoTG_DirPowerAttack", Settings::bEnableDirectionalAttack ? 1.0f : 0.0f},
-            {"bfcoTG_LmbPowerAttackNUM", Settings::bPowerAttackLMB ? 0.0f : 1.0f},
-            {"bfcoTG_RmbPowerAttackNUM", Settings::PowerAttackKey_m == 257 ? 1.0f : 0.0f}
+            {"bfcoTG_LmbPowerAttackNUM", (Settings::bPowerAttackLMB == 0) ? 1.0f : 0.0f},
+            {"bfcoTG_RmbPowerAttackNUM", Settings::PowerAttackKey_m == Settings::AttackKeyLeft_m ? 1.0f : 0.0f}
         };
 
         for (auto const& [editorID, value] : globalsToUpdate) {
@@ -173,22 +239,26 @@ namespace BFCOMenu {
 
         doc.AddMember("bEnableComboAttack", Settings::bEnableComboAttack, allocator);
         doc.AddMember("comboKey_k", Settings::comboKey_k, allocator);
+        doc.AddMember("comboKey_k_mod", Settings::comboKey_k_mod, allocator); // NOVO
         doc.AddMember("comboKey_m", Settings::comboKey_m, allocator);
+        doc.AddMember("comboKey_m_mod", Settings::comboKey_m_mod, allocator); // NOVO
         doc.AddMember("comboKey_g", Settings::comboKey_g, allocator);
+        doc.AddMember("comboKey_g_mod", Settings::comboKey_g_mod, allocator); // NOVO
 
         doc.AddMember("bEnableDirectionalAttack", Settings::bEnableDirectionalAttack, allocator);
         doc.AddMember("PowerAttackKey_k", Settings::PowerAttackKey_k, allocator);
+        doc.AddMember("PowerAttackKey_k_mod", Settings::PowerAttackKey_k_mod, allocator); // NOVO
         doc.AddMember("PowerAttackKey_m", Settings::PowerAttackKey_m, allocator);
+        doc.AddMember("PowerAttackKey_m_mod", Settings::PowerAttackKey_m_mod, allocator); // NOVO
         doc.AddMember("PowerAttackKey_g", Settings::PowerAttackKey_g, allocator);
+        doc.AddMember("PowerAttackKey_g_mod", Settings::PowerAttackKey_g_mod, allocator); // NOVO
 
         doc.AddMember("BlockKey_k", Settings::BlockKey_k, allocator);
+        doc.AddMember("BlockKey_k_mod", Settings::BlockKey_k_mod, allocator); // NOVO
         doc.AddMember("BlockKey_m", Settings::BlockKey_m, allocator);
+        doc.AddMember("BlockKey_m_mod", Settings::BlockKey_m_mod, allocator); // NOVO
         doc.AddMember("BlockKey_g", Settings::BlockKey_g, allocator);
-
-        //doc.AddMember("AttackKey_k", Settings::AttackKey_k, allocator);
-        //doc.AddMember("AttackKey_m", Settings::AttackKey_m, allocator);
-        //doc.AddMember("AttackKey_g", Settings::AttackKey_g, allocator);
-
+        doc.AddMember("BlockKey_g_mod", Settings::BlockKey_g_mod, allocator); // NOVO
 
         doc.AddMember("bEnablePowerAttack", Settings::bEnablePowerAttack, allocator);
         doc.AddMember("bDisableJumpingAttack", Settings::bDisableJumpingAttack, allocator);
@@ -206,8 +276,6 @@ namespace BFCOMenu {
             doc.Accept(writer);
             fclose(fp);
         }
-
-        // Após salvar, sempre atualize as Globals do jogo
         UpdateGameGlobals();
     }
 
@@ -223,54 +291,38 @@ namespace BFCOMenu {
             fclose(fp);
 
             if (doc.IsObject()) {
-                if (doc.HasMember("bEnableComboAttack") && doc["bEnableComboAttack"].IsBool())
-                    Settings::bEnableComboAttack = doc["bEnableComboAttack"].GetBool();
-                if (doc.HasMember("comboKey_k") && doc["comboKey_k"].IsInt())
-                    Settings::comboKey_k = doc["comboKey_k"].GetInt();
-                if (doc.HasMember("comboKey_m") && doc["comboKey_m"].IsInt())
-                    Settings::comboKey_m = doc["comboKey_m"].GetInt();
-                if (doc.HasMember("comboKey_g") && doc["comboKey_g"].IsInt())
-                    Settings::comboKey_g = doc["comboKey_g"].GetInt();
+                if (doc.HasMember("bEnableComboAttack")) Settings::bEnableComboAttack = doc["bEnableComboAttack"].GetBool();
+                if (doc.HasMember("comboKey_k")) Settings::comboKey_k = doc["comboKey_k"].GetInt();
+                if (doc.HasMember("comboKey_k_mod")) Settings::comboKey_k_mod = doc["comboKey_k_mod"].GetInt();
+                if (doc.HasMember("comboKey_m")) Settings::comboKey_m = doc["comboKey_m"].GetInt();
+                if (doc.HasMember("comboKey_m_mod")) Settings::comboKey_m_mod = doc["comboKey_m_mod"].GetInt();
+                if (doc.HasMember("comboKey_g")) Settings::comboKey_g = doc["comboKey_g"].GetInt();
+                if (doc.HasMember("comboKey_g_mod")) Settings::comboKey_g_mod = doc["comboKey_g_mod"].GetInt();
 
-                if (doc.HasMember("bEnableDirectionalAttack") && doc["bEnableDirectionalAttack"].IsBool())
-                    Settings::bEnableDirectionalAttack = doc["bEnableDirectionalAttack"].GetBool();
+                if (doc.HasMember("bEnableDirectionalAttack")) Settings::bEnableDirectionalAttack = doc["bEnableDirectionalAttack"].GetBool();
 
-                if (doc.HasMember("PowerAttackKey_k") && doc["PowerAttackKey_k"].IsInt())
-                    Settings::PowerAttackKey_k = doc["PowerAttackKey_k"].GetInt();
-                if (doc.HasMember("PowerAttackKey_m") && doc["PowerAttackKey_m"].IsInt())
-                    Settings::PowerAttackKey_m = doc["PowerAttackKey_m"].GetInt();
-                if (doc.HasMember("PowerAttackKey_g") && doc["PowerAttackKey_g"].IsInt())
-                    Settings::PowerAttackKey_g = doc["PowerAttackKey_g"].GetInt();
+                if (doc.HasMember("PowerAttackKey_k")) Settings::PowerAttackKey_k = doc["PowerAttackKey_k"].GetInt();
+                if (doc.HasMember("PowerAttackKey_k_mod")) Settings::PowerAttackKey_k_mod = doc["PowerAttackKey_k_mod"].GetInt();
+                if (doc.HasMember("PowerAttackKey_m")) Settings::PowerAttackKey_m = doc["PowerAttackKey_m"].GetInt();
+                if (doc.HasMember("PowerAttackKey_m_mod")) Settings::PowerAttackKey_m_mod = doc["PowerAttackKey_m_mod"].GetInt();
+                if (doc.HasMember("PowerAttackKey_g")) Settings::PowerAttackKey_g = doc["PowerAttackKey_g"].GetInt();
+                if (doc.HasMember("PowerAttackKey_g_mod")) Settings::PowerAttackKey_g_mod = doc["PowerAttackKey_g_mod"].GetInt();
 
-                if (doc.HasMember("BlockKey_k") && doc["BlockKey_k"].IsInt())
-                    Settings::BlockKey_k = doc["BlockKey_k"].GetInt();
-                if (doc.HasMember("BlockKey_m") && doc["BlockKey_m"].IsInt())
-                    Settings::BlockKey_m = doc["BlockKey_m"].GetInt();
-                if (doc.HasMember("BlockKey_g") && doc["BlockKey_g"].IsInt())
-                    Settings::BlockKey_g = doc["BlockKey_g"].GetInt();
+                if (doc.HasMember("BlockKey_k")) Settings::BlockKey_k = doc["BlockKey_k"].GetInt();
+                if (doc.HasMember("BlockKey_k_mod")) Settings::BlockKey_k_mod = doc["BlockKey_k_mod"].GetInt();
+                if (doc.HasMember("BlockKey_m")) Settings::BlockKey_m = doc["BlockKey_m"].GetInt();
+                if (doc.HasMember("BlockKey_m_mod")) Settings::BlockKey_m_mod = doc["BlockKey_m_mod"].GetInt();
+                if (doc.HasMember("BlockKey_g")) Settings::BlockKey_g = doc["BlockKey_g"].GetInt();
+                if (doc.HasMember("BlockKey_g_mod")) Settings::BlockKey_g_mod = doc["BlockKey_g_mod"].GetInt();
 
-                //if (doc.HasMember("AttackKey_k") && doc["AttackKey_k"].IsInt())
-                //    Settings::AttackKey_k = doc["AttackKey_k"].GetInt();
-                //if (doc.HasMember("AttackKey_m") && doc["AttackKey_m"].IsInt())
-                //    Settings::AttackKey_m = doc["AttackKey_m"].GetInt();
-                //if (doc.HasMember("AttackKey_g") && doc["AttackKey_g"].IsInt())
-                //    Settings::AttackKey_g = doc["AttackKey_g"].GetInt();
-
-                if (doc.HasMember("bEnablePowerAttack") && doc["bEnablePowerAttack"].IsBool())
-                    Settings::bEnablePowerAttack = doc["bEnablePowerAttack"].GetBool();
-                if (doc.HasMember("bDisableJumpingAttack") && doc["bDisableJumpingAttack"].IsBool())
-                    Settings::bDisableJumpingAttack = doc["bDisableJumpingAttack"].GetBool();
-                if (doc.HasMember("bPowerAttackLMB") && doc["bPowerAttackLMB"].IsBool())
-                    Settings::bPowerAttackLMB = doc["bPowerAttackLMB"].GetBool();
-                if (doc.HasMember("lockSprintAttack") && doc["lockSprintAttack"].IsBool())
-                    Settings::lockSprintAttack = doc["lockSprintAttack"].GetBool();
-                if (doc.HasMember("disableMStaBash") && doc["disableMStaBash"].IsBool())
-                    Settings::disableMStaBash = doc["disableMStaBash"].GetBool();
-                if (doc.HasMember("disableDualblock") && doc["disableDualblock"].IsBool())
-                    Settings::disableDualblock = doc["disableDualblock"].GetBool();
+                if (doc.HasMember("bEnablePowerAttack")) Settings::bEnablePowerAttack = doc["bEnablePowerAttack"].GetBool();
+                if (doc.HasMember("bDisableJumpingAttack")) Settings::bDisableJumpingAttack = doc["bDisableJumpingAttack"].GetBool();
+                if (doc.HasMember("bPowerAttackLMB")) Settings::bPowerAttackLMB = doc["bPowerAttackLMB"].GetInt();
+                if (doc.HasMember("lockSprintAttack")) Settings::lockSprintAttack = doc["lockSprintAttack"].GetBool();
+                if (doc.HasMember("disableMStaBash")) Settings::disableMStaBash = doc["disableMStaBash"].GetBool();
+                if (doc.HasMember("disableDualblock")) Settings::disableDualblock = doc["disableDualblock"].GetBool();
             }
         }
-        // Após carregar, sempre atualize as Globals do jogo
         UpdateGameGlobals();
     }
 

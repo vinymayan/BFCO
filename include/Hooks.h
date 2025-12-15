@@ -61,6 +61,8 @@ extern RE::BGSAction* Bash;
 void GetAttackKeys();
 
 namespace GlobalControl{
+    inline bool isProcessingRegistration = false;
+
     class AnimationEventHandler : public RE::BSTEventSink<RE::BSAnimationGraphEvent> {
     public:
         static AnimationEventHandler* GetSingleton() {
@@ -70,5 +72,16 @@ namespace GlobalControl{
 
         RE::BSEventNotifyControl ProcessEvent(const RE::BSAnimationGraphEvent* a_event,
                                               RE::BSTEventSource<RE::BSAnimationGraphEvent>*) override;
+    };
+
+    class PC3DLoadEventHandler : public RE::BSTEventSink<RE::TESObjectLoadedEvent> {
+    public:
+        
+        static PC3DLoadEventHandler* GetSingleton() {
+            static PC3DLoadEventHandler singleton;
+            return &singleton;
+        }
+        
+        RE::BSEventNotifyControl ProcessEvent(const RE::TESObjectLoadedEvent* a_event, RE::BSTEventSource<RE::TESObjectLoadedEvent>*) override;
     };
 }

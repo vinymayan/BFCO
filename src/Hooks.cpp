@@ -8,6 +8,7 @@ extern const SKSE::TaskInterface* g_task;
 const std::string pluginName = "SCSI-ACTbfco-Main.esp";
 const std::string skyrim = "Skyrim.esm";
 const std::string update = "Update.esm";
+const std::string dragon = "PlayableDragon.esp";
 
 RE::BGSAction* PowerRight = nullptr;
 RE::BGSAction* Draw = nullptr;
@@ -20,7 +21,49 @@ RE::BGSAction* RightAttack = nullptr;
 RE::BGSAction* PowerAttack = nullptr;
 RE::BGSAction* Bash = nullptr;
 
+std::set<uint32_t> pressedKeys_K; // Teclado
+std::set<uint32_t> pressedKeys_M; // Mouse
+std::set<uint32_t> pressedKeys_G; // Gamepad
 
+bool IsKeyPressed(uint32_t key) {
+    // No teu código, definimos que teclas do rato são >= 256 (devido ao offset que adicionaste)
+    if (key >= 256) {
+        return pressedKeys_M.count(key) > 0;
+    }
+    // Teclas de Gamepad (se usares códigos muito altos para gamepad, ajusta aqui, mas geralmente são tratados à parte)
+    // Assumindo que o resto é teclado:
+    return pressedKeys_K.count(key) > 0;
+}
+
+
+bool CheckKeyCombination(uint32_t eventKeyCode, RE::INPUT_DEVICE device,
+    uint32_t settingKey, uint32_t settingMod) {
+
+    // Se a tecla principal da configuração for 0, está desativado
+    if (settingKey == 0) return false;
+
+    // Se NÃO houver modificador (ou for 0), é uma tecla simples
+    if (settingMod == 0) {
+        return eventKeyCode == settingKey;
+    }
+
+    // LÓGICA DE COMBINAÇÃO:
+
+    // Caso 1: Acabaste de apertar a TECLA PRINCIPAL (ex: RMB)
+    if (eventKeyCode == settingKey) {
+        // Precisamos verificar se o MODIFICADOR (ex: Ctrl) já está pressionado.
+        // Usamos IsKeyPressed para procurar o Ctrl no teclado, mesmo que o evento atual seja do mouse.
+        return IsKeyPressed(settingMod);
+    }
+
+    // Caso 2: Acabaste de apertar o MODIFICADOR (ex: Ctrl)
+    if (eventKeyCode == settingMod) {
+        // Precisamos verificar se a TECLA PRINCIPAL (ex: RMB) já está pressionada (segurada).
+        return IsKeyPressed(settingKey);
+    }
+
+    return false;
+}
 
 void AttackStateManager::Register() {
     SKSE::log::info("Tentando registrar listener de input...");
@@ -131,10 +174,13 @@ void GetAttackKeys() {
     float newDelay = 1100.0f / 1000.0f;
     setting->data.f = newDelay;*/
 
-    // leftAttackKeyKeyboard = controlMap->GetMappedKey(userEvents->leftAttack, RE::INPUT_DEVICE::kKeyboard);
-    // leftAttackKeyMouse = controlMap->GetMappedKey(userEvents->leftAttack, RE::INPUT_DEVICE::kMouse);
-    // leftAttackKeyGamepad = controlMap->GetMappedKey(userEvents->leftAttack, RE::INPUT_DEVICE::kGamepad);
-    // leftAttackKeyGamepad = SKSE::InputMap::GamepadMaskToKeycode(leftAttackKeyGamepad);
+    Settings::AttackKeyLeft_k = controlMap->GetMappedKey(userEvents->leftAttack, RE::INPUT_DEVICE::kKeyboard);
+	logger::info("AttackKeyLeft_k: {}", Settings::AttackKeyLeft_k);
+    Settings::AttackKeyLeft_m = controlMap->GetMappedKey(userEvents->leftAttack, RE::INPUT_DEVICE::kMouse);
+	logger::info("AttackKeyLeft_m: {}", Settings::AttackKeyLeft_m);
+    Settings::AttackKeyLeft_m += 256;
+    Settings::AttackKeyLeft_g = controlMap->GetMappedKey(userEvents->leftAttack, RE::INPUT_DEVICE::kGamepad);
+	logger::info("AttackKeyLeft_g (before conversion): {}", Settings::AttackKeyLeft_g);
 }
 
 bool IsLeftHandNotWeapon(RE::Actor* a_actor) {
@@ -186,7 +232,8 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
         }
        
         auto device = buttonEvent->GetDevice();
-        auto keyCode = buttonEvent->GetIDCode();
+        auto rawKeyCode = buttonEvent->GetIDCode();
+        auto keyCode = rawKeyCode;
         const auto playerState = player->AsActorState();
         
 
@@ -202,24 +249,63 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
             keyCode += 256;  // Ajusta o código do mouse para corresponder às configurações
         }
 
-        bool isBlockBtnPressed = (device == RE::INPUT_DEVICE::kKeyboard && keyCode == Settings::BlockKey_k) ||
-                                 (device == RE::INPUT_DEVICE::kMouse && keyCode == Settings::BlockKey_m) ||
-                                 (device == RE::INPUT_DEVICE::kGamepad && keyCode == Settings::BlockKey_g);
+        if (buttonEvent->IsDown()) {
+            if (device == RE::INPUT_DEVICE::kKeyboard) pressedKeys_K.insert(keyCode);
+            else if (device == RE::INPUT_DEVICE::kMouse) pressedKeys_M.insert(keyCode);
+            else if (device == RE::INPUT_DEVICE::kGamepad) pressedKeys_G.insert(keyCode);
+        }
+        else if (buttonEvent->IsUp()) {
+            if (device == RE::INPUT_DEVICE::kKeyboard) pressedKeys_K.erase(keyCode);
+            else if (device == RE::INPUT_DEVICE::kMouse) pressedKeys_M.erase(keyCode);
+            else if (device == RE::INPUT_DEVICE::kGamepad) pressedKeys_G.erase(keyCode);
+        }
+
+        bool isBlockBtnPressed = false;
+        bool isAttackBtnPressed = false;
+        bool isLAttackBtnPressed = false;
+        bool isPowerAttackKeyPressed = false;
+        bool comboKeyPressed = false;
+
+        if (CheckKeyCombination(keyCode, device, Settings::BlockKey_k, Settings::BlockKey_k_mod))
+            isBlockBtnPressed = true;
+        // Verifica Config Principal Mouse (se ainda não encontrou)
+        if (!isBlockBtnPressed && CheckKeyCombination(keyCode, device, Settings::BlockKey_m, Settings::BlockKey_m_mod))
+            isBlockBtnPressed = true;
+        // Verifica Gamepad (apenas se o input atual for gamepad para evitar conflitos de ID)
+        if (!isBlockBtnPressed && device == RE::INPUT_DEVICE::kGamepad) {
+            if (CheckKeyCombination(keyCode, device, Settings::BlockKey_g, Settings::BlockKey_g_mod))
+                isBlockBtnPressed = true;
+        }
+
+        // --- POWER ATTACK ---
+        if (CheckKeyCombination(keyCode, device, Settings::PowerAttackKey_k, Settings::PowerAttackKey_k_mod))
+            isPowerAttackKeyPressed = true;
+        if (!isPowerAttackKeyPressed && CheckKeyCombination(keyCode, device, Settings::PowerAttackKey_m, Settings::PowerAttackKey_m_mod))
+            isPowerAttackKeyPressed = true;
+        if (!isPowerAttackKeyPressed && device == RE::INPUT_DEVICE::kGamepad) {
+            if (CheckKeyCombination(keyCode, device, Settings::PowerAttackKey_g, Settings::PowerAttackKey_g_mod))
+                isPowerAttackKeyPressed = true;
+        }
+
+        // --- COMBO ATTACK ---
+        if (CheckKeyCombination(keyCode, device, Settings::comboKey_k, Settings::comboKey_k_mod))
+            comboKeyPressed = true;
+        if (!comboKeyPressed && CheckKeyCombination(keyCode, device, Settings::comboKey_m, Settings::comboKey_m_mod))
+            comboKeyPressed = true;
+        if (!comboKeyPressed && device == RE::INPUT_DEVICE::kGamepad) {
+            if (CheckKeyCombination(keyCode, device, Settings::comboKey_g, Settings::comboKey_g_mod))
+                comboKeyPressed = true;
+        }
+
+        // --- NORMAL ATTACK (Mantém lógica simples ou adapta se quiser mods também) ---
         
-        bool isAttackBtnPressed = (device == RE::INPUT_DEVICE::kKeyboard && keyCode == Settings::AttackKey_k) ||
-                                  (device == RE::INPUT_DEVICE::kMouse && keyCode == Settings::AttackKey_m) ||
-                                  (device == RE::INPUT_DEVICE::kGamepad && keyCode == Settings::AttackKey_g);
+        if (device == RE::INPUT_DEVICE::kKeyboard) isAttackBtnPressed = (keyCode == Settings::AttackKey_k);
+        else if (device == RE::INPUT_DEVICE::kMouse) isAttackBtnPressed = (keyCode == Settings::AttackKey_m);
+        else if (device == RE::INPUT_DEVICE::kGamepad) isAttackBtnPressed = (keyCode == Settings::AttackKey_g);
 
-        bool isPowerAttackKeyPressed = (device == RE::INPUT_DEVICE::kKeyboard && keyCode == Settings::PowerAttackKey_k) ||
-                                       (device == RE::INPUT_DEVICE::kMouse && keyCode == Settings::PowerAttackKey_m) ||
-                                       (device == RE::INPUT_DEVICE::kGamepad && keyCode == Settings::PowerAttackKey_g);
-
-        
-
-        bool comboKeyPressed = (device == RE::INPUT_DEVICE::kKeyboard && keyCode == Settings::comboKey_k) ||
-                                 (device == RE::INPUT_DEVICE::kMouse && keyCode == Settings::comboKey_m) ||
-                                 (device == RE::INPUT_DEVICE::kGamepad && keyCode == Settings::comboKey_g);
-
+        if (device == RE::INPUT_DEVICE::kKeyboard) isLAttackBtnPressed = (keyCode == Settings::AttackKeyLeft_k);
+        else if (device == RE::INPUT_DEVICE::kMouse) isLAttackBtnPressed = (keyCode == Settings::AttackKeyLeft_m);
+        else if (device == RE::INPUT_DEVICE::kGamepad) isLAttackBtnPressed = (keyCode == Settings::AttackKeyLeft_g);
 
        
        
@@ -231,6 +317,8 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
         player->GetGraphVariableInt("ADTF_ShouldDelay", isStrong);
         float currentStamina = player->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina);
         auto* PowerNormal = GetIdleByFormID(0x8C5, pluginName);
+        auto* AutoAA = GetIdleByFormID(0x83A, pluginName);
+        auto* AutoAABow = GetIdleByFormID(0x8FA, pluginName);
         auto* PowerH2H = GetIdleByFormID(0x839, pluginName);
         auto* PowerBash = GetIdleByFormID(0x8C0, pluginName);
         auto* SprintPower = GetIdleByFormID(0x8BE, pluginName);
@@ -243,6 +331,8 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
         auto* Teste2 = GetIdleByFormID(0xE8456, skyrim);
         auto* Idle = GetActionByFormID(0x13002, skyrim);
         auto* Dodge = GetIdleByFormID(0x935, pluginName);
+        auto* TailSmash = GetIdleByFormID(0x11ED35, dragon);
+        //auto* TailSmash = GetIdleByFormID(0x11ED35, dragon);
         int isDodging = 0;
         int revocery = 0;
 
@@ -281,9 +371,22 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                 }
 
                 else if (buttonEvent->IsUp()) {
-                    Settings::_isCurrentlyBlocking = false;
-                    player->NotifyAnimationGraph("blockStop");
-                    PlayIdleAnimation(player, BlockRelease);
+                    bool releasedBlockKey = false;
+                    if (device == RE::INPUT_DEVICE::kKeyboard) {
+                        if (keyCode == Settings::BlockKey_k || (Settings::BlockKey_k_mod != 0 && keyCode == Settings::BlockKey_k_mod)) releasedBlockKey = true;
+                    }
+                    else if (device == RE::INPUT_DEVICE::kMouse) {
+                        if (keyCode == Settings::BlockKey_m || (Settings::BlockKey_m_mod != 0 && keyCode == Settings::BlockKey_m_mod)) releasedBlockKey = true;
+                    }
+                    else if (device == RE::INPUT_DEVICE::kGamepad) {
+                        if (keyCode == Settings::BlockKey_g || (Settings::BlockKey_g_mod != 0 && keyCode == Settings::BlockKey_g_mod)) releasedBlockKey = true;
+                    }
+
+                    if (releasedBlockKey && Settings::_isCurrentlyBlocking) {
+                        Settings::_isCurrentlyBlocking = false;
+                        player->NotifyAnimationGraph("blockStop");
+                        PlayIdleAnimation(player, BlockRelease);
+                    }
                 }
 
             }
@@ -297,8 +400,11 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
 
                player->NotifyAnimationGraph("MCO_EndAnimation");
 
-               if (Settings::bPowerAttackLMB) {
+               if (Settings::bPowerAttackLMB > 0) {
                    player->SetGraphVariableInt("NEW_BFCO_DisablePALMB", 1);
+               }
+               else {
+				   player->SetGraphVariableInt("NEW_BFCO_DisablePALMB", 0);
                }
                if (Settings::_isCurrentlyBlocking) {
                    if (Settings::disableMStaBash) {
@@ -321,9 +427,19 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                    player->SetGraphVariableInt("NEW_BFCO_IsNormalAttacking", 1);
                }
                else if (isStrong == 1) {
-                   if (Settings::bPowerAttackLMB) {
+                   if (Settings::bPowerAttackLMB > 0) {
                        player->SetGraphVariableInt("NEW_BFCO_IsNormalAttacking", 1);
-                       PerformAction(NormalAttack, player);
+                       player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 0);
+                       if (AutoAABow->conditions.IsTrue(player, player)) {
+                           logger::info("AutoAA triggered by 1held condition is true.");
+                           player->NotifyAnimationGraph("MCO_EndAnimation");
+                           PlayIdleAnimation(player, AutoAABow);
+                       }
+                       else if (AutoAA->conditions.IsTrue(player, player)) {
+                           logger::info("AutoAA condition is true.");
+                           player->NotifyAnimationGraph("MCO_EndAnimation");
+                           PlayIdleAnimation(player, AutoAA);
+                       }
                    }
                    else {
                        player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 1);
@@ -338,10 +454,44 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                     if (currentStamina <= 0) {
                         return RE::BSEventNotifyControl::kContinue;
                     }
-                    if (Settings::PowerAttackKey_m == 257) {
+                    if (Settings::PowerAttackKey_m == Settings::AttackKeyLeft_m || Settings::PowerAttackKey_g == Settings::AttackKeyLeft_g || Settings::PowerAttackKey_k == Settings::AttackKeyLeft_k) {
                         if (IsLeftHandNotWeapon(player)) {
                             return RE::BSEventNotifyControl::kContinue;
                         }
+                    }
+
+                    bool isLeftHandInvolved = false;
+
+                    if (device == RE::INPUT_DEVICE::kKeyboard) {
+                        // Verifica se Left Attack é a tecla PA ou o Modificador PA no teclado
+                        if (Settings::PowerAttackKey_k == Settings::AttackKeyLeft_k ||
+                            (Settings::PowerAttackKey_k_mod != 0 && Settings::PowerAttackKey_k_mod == Settings::AttackKeyLeft_k)) {
+                            isLeftHandInvolved = true;
+                        }
+                    }
+                    else if (device == RE::INPUT_DEVICE::kMouse) {
+                        // Verifica no mouse
+                        if (Settings::PowerAttackKey_m == Settings::AttackKeyLeft_m ||
+                            (Settings::PowerAttackKey_m_mod != 0 && Settings::PowerAttackKey_m_mod == Settings::AttackKeyLeft_m)) {
+                            isLeftHandInvolved = true;
+                        }
+                    }
+                    else if (device == RE::INPUT_DEVICE::kGamepad) {
+                        // Verifica no gamepad
+                        if (Settings::PowerAttackKey_g == Settings::AttackKeyLeft_g ||
+                            (Settings::PowerAttackKey_g_mod != 0 && Settings::PowerAttackKey_g_mod == Settings::AttackKeyLeft_g)) {
+                            isLeftHandInvolved = true;
+                        }
+                    }
+
+                    // Se a mão esquerda estiver envolvida na combinação que disparou o PA:
+                    if (isLeftHandInvolved) {
+						logger::info("Power Attack triggered with Left Hand involved.");
+                        player->SetGraphVariableInt("BFCONG_PARMB", 1);
+                    }
+
+                    if (Settings::bPowerAttackLMB > 0 && isAttackBtnPressed && !isLeftHandInvolved) {
+                        return RE::BSEventNotifyControl::kContinue;
                     }
 
                     if (SprintPower->conditions.IsTrue(player, player)) {
@@ -420,14 +570,71 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                     
                 }
             } 
+    //        if (isLAttackBtnPressed) {
+    //            //player->NotifyAnimationGraph("attackStartTail");
+				//logger::info("Tail Smash Attack Triggered");
+				//PlayIdleAnimation(player, TailSmash);
+    //        }
             
         } 
+
+        if (buttonEvent->IsHeld()) {
+            if (isAttackBtnPressed) {
+                if (Settings::bPowerAttackLMB == 2) {
+                    if (isStrong == 1) {
+                        player->SetGraphVariableInt("NEW_BFCO_IsNormalAttacking", 1);
+                        player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 0);
+                        if (AutoAA->conditions.IsTrue(player, player)) {
+                            logger::info("AutoAA triggered by held condition is true.");
+                            player->NotifyAnimationGraph("MCO_EndAnimation");
+                            PlayIdleAnimation(player, AutoAA);
+                        }
+                    }
+                    
+                }
+            }
+            if (isLAttackBtnPressed) {
+                if (Settings::bPowerAttackLMB) {
+                    bool isRangedWeapon = false;
+                    // 'false' pega a mão direita (Main Hand), onde o Arco é registrado
+                    auto equippedObj = player->GetEquippedObject(false);
+                    if (equippedObj && equippedObj->IsWeapon()) {
+                        auto weapon = equippedObj->As<RE::TESObjectWEAP>();
+                        if (weapon->GetWeaponType() == RE::WEAPON_TYPE::kBow ||
+                            weapon->GetWeaponType() == RE::WEAPON_TYPE::kCrossbow) {
+                            isRangedWeapon = true;
+                        }
+                    }
+                    if (isRangedWeapon) {
+                        if (AutoAABow->conditions.IsTrue(player, player)) {
+                            logger::info("AutoAA triggered by bow held condition is true.");
+                            player->NotifyAnimationGraph("MCO_EndAnimation");
+                            PlayIdleAnimation(player, AutoAABow);
+                        }
+                    }
+                }
+            }
+        
+		}
 
         if (buttonEvent->IsUp()) {
             if (Settings::bEnablePowerAttack) {
                 if (isPowerAttackKeyPressed) {
-                    logger::info("Power Attack Key Released");
-                    player->NotifyAnimationGraph("BFCOAttackstart_1");
+                    bool releasedPAKey = false;
+                    if (device == RE::INPUT_DEVICE::kKeyboard) {
+                        if (keyCode == Settings::PowerAttackKey_k || (Settings::PowerAttackKey_k_mod != 0 && keyCode == Settings::PowerAttackKey_k_mod)) releasedPAKey = true;
+                    }
+                    else if (device == RE::INPUT_DEVICE::kMouse) {
+                        if (keyCode == Settings::PowerAttackKey_m || (Settings::PowerAttackKey_m_mod != 0 && keyCode == Settings::PowerAttackKey_m_mod)) releasedPAKey = true;
+                    }
+                    else if (device == RE::INPUT_DEVICE::kGamepad) {
+                        if (keyCode == Settings::PowerAttackKey_g || (Settings::PowerAttackKey_g_mod != 0 && keyCode == Settings::PowerAttackKey_g_mod)) releasedPAKey = true;
+                    }
+
+                    if (releasedPAKey) {
+                        logger::info("Power Attack Key Released");
+                        player->NotifyAnimationGraph("BFCOAttackstart_1");
+                    }
                 }
             }
         }
@@ -442,12 +649,13 @@ RE::BSEventNotifyControl GlobalControl::AnimationEventHandler::ProcessEvent(
     auto player = RE::PlayerCharacter::GetSingleton();
     const std::string_view eventName = a_event->tag;
     if (a_event && a_event->holder && a_event->holder->IsPlayerRef()) {
-        
+        auto* AutoAA = GetIdleByFormID(0x83A, pluginName);
        
         if (eventName == "Bfco_AttackStartFX") {
             player->SetGraphVariableInt("NEW_BFCO_IsNormalAttacking", 0);
             player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 0);
-
+            player->SetGraphVariableInt("BFCONG_PARMB", 0);
+            player->SetGraphVariableInt("NEW_BFCO_DisablePALMB", 0);
 
         } else if (eventName == "bashStop") {
             if (Settings::_isCurrentlyBlocking) {
@@ -456,7 +664,71 @@ RE::BSEventNotifyControl GlobalControl::AnimationEventHandler::ProcessEvent(
         }else if (eventName == "MCO_DodgeOpen") {
             Settings::DodgeCancel = true;
         }
+        //else if (eventName == "MCO_WindowOpen" || eventName == "BFCO_NextWinStart") {
+        //    // Verifica se o modo automático deve estar ativo
+        //    // (Lógica: Se bPowerAttackLMB for false, assume-se comportamento automático no LMB)
+        //    if (Settings::bPowerAttackLMB) {
+
+        //        bool isAttackHeld = false;
+
+        //        // Verifica se a tecla de ataque está sendo segurada no Teclado, Mouse ou Gamepad
+        //        if (IsKeyPressed(Settings::AttackKey_k) || IsKeyPressed(Settings::AttackKey_m)) {
+        //            isAttackHeld = true;
+        //        }
+        //        // Se quiser suporte a gamepad, adicione a verificação do pressedKeys_G aqui também
+
+        //        if (isAttackHeld) {
+        //            SKSE::log::info("Auto Attack Triggered by Hold"); // Debug se necessário
+        //            player->SetGraphVariableInt("NEW_BFCO_IsNormalAttacking", 1);
+        //            player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 0);
+        //            if (AutoAA->conditions.IsTrue(player, player)) {
+        //                logger::info("AutoAA triggered by window condition is true.");
+        //                player->NotifyAnimationGraph("MCO_EndAnimation");
+        //                PlayIdleAnimation(player, AutoAA);
+        //            }
+
+        //        }
+        //    }
+        //}
+        
     }
     
+    return RE::BSEventNotifyControl::kContinue;
+}
+
+RE::BSEventNotifyControl GlobalControl::PC3DLoadEventHandler::ProcessEvent(const RE::TESObjectLoadedEvent* a_event, RE::BSTEventSource<RE::TESObjectLoadedEvent>*) {
+    if (!a_event || !a_event->loaded) return RE::BSEventNotifyControl::kContinue;
+
+    // Filtra EXTRITAMENTE para o Player (FormID 0x14)
+    if (a_event->formID == 0x14) {
+        // Evita spam de requests se já estiver processando
+        if (isProcessingRegistration) return RE::BSEventNotifyControl::kContinue;
+        isProcessingRegistration = true;
+
+        // Não precisamos de std::thread + sleep aqui necessariamente se usarmos a Task Interface
+        // O jogo acabou de carregar o 3D, mas o Graph pode demorar alguns frames.
+        // Usamos uma task simples para rodar no próximo frame lógico.
+        SKSE::GetTaskInterface()->AddTask([]() {
+            auto* player = RE::PlayerCharacter::GetSingleton();
+            if (player) {
+                // Verifica se o Graph Manager existe antes de prosseguir
+                RE::BSTSmartPointer<RE::BSAnimationGraphManager> graphManager;
+                player->GetAnimationGraphManager(graphManager);
+
+                if (graphManager) {
+                    player->RemoveAnimationGraphEventSink(AnimationEventHandler::GetSingleton());
+                    player->AddAnimationGraphEventSink(AnimationEventHandler::GetSingleton());
+                }
+                else {
+                    // Se falhar, aí sim tentamos agendar uma nova verificação (fail-safe)
+                    // Mas na maioria dos casos, no LoadedEvent o graph já está inicializando
+                    isProcessingRegistration = false;
+                }
+            }
+            else {
+                isProcessingRegistration = false;
+            }
+            });
+    }
     return RE::BSEventNotifyControl::kContinue;
 }
