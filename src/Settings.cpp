@@ -187,7 +187,6 @@ namespace BFCOMenu {
             ImGui::SetTooltip("Vanilla: Default behavior\nDisable PA: Disables Power Attack on click\nAuto Mode: Holds attack for combos automatically");
         }
 
-        
         ImGui::Spacing();
         ImGui::Separator();
         if (ImGui::Checkbox("Disable bash in block key (Beta)", &Settings::disableMStaBash)) settings_changed = true;

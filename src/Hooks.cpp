@@ -525,7 +525,7 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                             } else {
                                 PlayIdleAnimation(player, PowerNormal);
                             }
-                         
+                            //player->SetGraphVariableInt("BFCONG_PARMB", 0);
                     }
                 }
             }
@@ -585,7 +585,7 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                         player->SetGraphVariableInt("NEW_BFCO_IsNormalAttacking", 1);
                         player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 0);
                         if (AutoAA->conditions.IsTrue(player, player)) {
-                            logger::info("AutoAA triggered by held condition is true.");
+                            //logger::info("AutoAA triggered by held condition is true.");
                             player->NotifyAnimationGraph("MCO_EndAnimation");
                             PlayIdleAnimation(player, AutoAA);
                         }
@@ -654,7 +654,7 @@ RE::BSEventNotifyControl GlobalControl::AnimationEventHandler::ProcessEvent(
         if (eventName == "Bfco_AttackStartFX") {
             player->SetGraphVariableInt("NEW_BFCO_IsNormalAttacking", 0);
             player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 0);
-            player->SetGraphVariableInt("BFCONG_PARMB", 0);
+            //player->SetGraphVariableInt("BFCONG_PARMB", 0);
             player->SetGraphVariableInt("NEW_BFCO_DisablePALMB", 0);
 
         } else if (eventName == "bashStop") {
@@ -663,6 +663,11 @@ RE::BSEventNotifyControl GlobalControl::AnimationEventHandler::ProcessEvent(
             }
         }else if (eventName == "MCO_DodgeOpen") {
             Settings::DodgeCancel = true;
+        }else if (eventName == "weaponSwing" || eventName == "weaponLeftSwing" ||
+            eventName == "h2hAttack" || eventName == "PowerAttack_Start_end") {
+
+            player->SetGraphVariableInt("BFCONG_PARMB", 0);
+
         }
         //else if (eventName == "MCO_WindowOpen" || eventName == "BFCO_NextWinStart") {
         //    // Verifica se o modo automático deve estar ativo
