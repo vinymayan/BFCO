@@ -193,7 +193,7 @@ bool IsLeftHandNotWeapon(RE::Actor* a_actor) {
 
     // Se não houver objeto equipado (nullptr), a mão está vazia, logo não é arma.
     if (!equippedObj) {
-        return true;
+        return false;
     }
 
     // Verifica se o tipo do formulário é Weapon (Arma).
@@ -331,7 +331,7 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
         auto* Teste2 = GetIdleByFormID(0xE8456, skyrim);
         auto* Idle = GetActionByFormID(0x13002, skyrim);
         auto* Dodge = GetIdleByFormID(0x935, pluginName);
-        auto* TailSmash = GetIdleByFormID(0x11ED35, dragon);
+        //auto* TailSmash = GetIdleByFormID(0x11ED35, dragon);
         //auto* TailSmash = GetIdleByFormID(0x11ED35, dragon);
         int isDodging = 0;
         int revocery = 0;
@@ -431,12 +431,12 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                        player->SetGraphVariableInt("NEW_BFCO_IsNormalAttacking", 1);
                        player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 0);
                        if (AutoAABow->conditions.IsTrue(player, player)) {
-                           logger::info("AutoAA triggered by 1held condition is true.");
+                           //logger::info("AutoAA triggered by 1held condition is true.");
                            player->NotifyAnimationGraph("MCO_EndAnimation");
                            PlayIdleAnimation(player, AutoAABow);
                        }
                        else if (AutoAA->conditions.IsTrue(player, player)) {
-                           logger::info("AutoAA condition is true.");
+                           //logger::info("AutoAA condition is true.");
                            player->NotifyAnimationGraph("MCO_EndAnimation");
                            PlayIdleAnimation(player, AutoAA);
                        }
@@ -486,7 +486,7 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
 
                     // Se a mão esquerda estiver envolvida na combinação que disparou o PA:
                     if (isLeftHandInvolved) {
-						logger::info("Power Attack triggered with Left Hand involved.");
+						//logger::info("Power Attack triggered with Left Hand involved.");
                         player->SetGraphVariableInt("BFCONG_PARMB", 1);
                     }
 
@@ -495,20 +495,20 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                     }
 
                     if (SprintPower->conditions.IsTrue(player, player)) {
-                        logger::info("SprintPower condition is true.");
+                        //logger::info("SprintPower condition is true.");
                         player->NotifyAnimationGraph("MCO_EndAnimation");
                         PlayIdleAnimation(player, SprintPower);
                     } else if (!Settings::disableMStaBash && PowerBash->conditions.IsTrue(player, player)) {
-                        logger::info("PowerBash condition is true.");
+                        //logger::info("PowerBash condition is true.");
                         player->NotifyAnimationGraph("MCO_EndAnimation");
                         PlayIdleAnimation(player, PowerBash);
                     } else if (PowerH2H->conditions.IsTrue(player, player)) {
-                        logger::info("PowerH2H condition is true.");
+                        //logger::info("PowerH2H condition is true.");
                         player->NotifyAnimationGraph("MCO_EndAnimation");
                         PlayIdleAnimation(player, PowerH2H);
                     } else {
                         if (Dodge->conditions.IsTrue(player, player)) {
-                            logger::info("Dodge condition is true.");
+                            //logger::info("Dodge condition is true.");
                             player->NotifyAnimationGraph("MCO_EndAnimation");
                             PlayIdleAnimation(player, Dodge);
                         }
@@ -607,7 +607,7 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                     }
                     if (isRangedWeapon) {
                         if (AutoAABow->conditions.IsTrue(player, player)) {
-                            logger::info("AutoAA triggered by bow held condition is true.");
+                            //logger::info("AutoAA triggered by bow held condition is true.");
                             player->NotifyAnimationGraph("MCO_EndAnimation");
                             PlayIdleAnimation(player, AutoAABow);
                         }
@@ -632,7 +632,7 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                     }
 
                     if (releasedPAKey) {
-                        logger::info("Power Attack Key Released");
+                       // logger::info("Power Attack Key Released");
                         player->NotifyAnimationGraph("BFCOAttackstart_1");
                     }
                 }
