@@ -38,6 +38,7 @@ extern RE::TESIdleForm* BlockRelease;
 extern RE::TESIdleForm* Dodge;
 extern RE::TESIdleForm* TailSmash;
 
+inline bool releaseBlock = false;
 RE::TESIdleForm* GetIdleByFormID(RE::FormID a_formID, const std::string& a_pluginName);
 
 class AnimationEventHandler : public RE::BSTEventSink<RE::BSAnimationGraphEvent> {

@@ -348,44 +348,44 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                     Settings::_isCurrentlyBlocking = true;
                     player->NotifyAnimationGraph("MCO_AnimStop");
                     player->NotifyAnimationGraph("MCO_EndAnimation");
-                    player->SetGraphVariableInt("BFCO_IsBlocking", 1);
+                    player->SetGraphVariableInt("BFCONG_Block", 1);
                     player->SetGraphVariableBool("IsBlocking", true);
-
 
                     PlayIdleAnimation(player, BlockStart);
                     //PerformAction(ReleaseBlock, player);
-                } else if (buttonEvent->IsHeld()) {
-                    Settings::_isCurrentlyBlocking = true;
+             }
+             else if (buttonEvent->IsHeld()) {
+                 Settings::_isCurrentlyBlocking = true;
+             }
+             else if (buttonEvent->IsUp()) {
+                 bool releasedBlockKey = false;
+                 if (device == RE::INPUT_DEVICE::kKeyboard) {
+                     if (keyCode == Settings::BlockKey_k || (Settings::BlockKey_k_mod != 0 && keyCode == Settings::BlockKey_k_mod)) releasedBlockKey = true;
+                 }
+                 else if (device == RE::INPUT_DEVICE::kMouse) {
+                     if (keyCode == Settings::BlockKey_m || (Settings::BlockKey_m_mod != 0 && keyCode == Settings::BlockKey_m_mod)) releasedBlockKey = true;
+                 }
+                 else if (device == RE::INPUT_DEVICE::kGamepad) {
+                     if (keyCode == Settings::BlockKey_g || (Settings::BlockKey_g_mod != 0 && keyCode == Settings::BlockKey_g_mod)) releasedBlockKey = true;
+                 }
 
-                }
-                else if (buttonEvent->IsUp()) {
-                    bool releasedBlockKey = false;
-                    if (device == RE::INPUT_DEVICE::kKeyboard) {
-                        if (keyCode == Settings::BlockKey_k || (Settings::BlockKey_k_mod != 0 && keyCode == Settings::BlockKey_k_mod)) releasedBlockKey = true;
-                    }
-                    else if (device == RE::INPUT_DEVICE::kMouse) {
-                        if (keyCode == Settings::BlockKey_m || (Settings::BlockKey_m_mod != 0 && keyCode == Settings::BlockKey_m_mod)) releasedBlockKey = true;
-                    }
-                    else if (device == RE::INPUT_DEVICE::kGamepad) {
-                        if (keyCode == Settings::BlockKey_g || (Settings::BlockKey_g_mod != 0 && keyCode == Settings::BlockKey_g_mod)) releasedBlockKey = true;
-                    }
+                 if (releasedBlockKey && Settings::_isCurrentlyBlocking) {
+                     Settings::_isCurrentlyBlocking = false;
+                     player->NotifyAnimationGraph("MCO_EndAnimation");
+                     player->SetGraphVariableInt("BFCO_IsPlayerInputOK", 0);
+                     player->SetGraphVariableInt("ADTF_ShouldDelay", 0);
+                     player->SetGraphVariableInt("BFCONG_Block", 0);
+                     player->SetGraphVariableBool("IsBlocking", false);
+                     //player->NotifyAnimationGraph("blockStop");
+                     if (BlockRelease->conditions.IsTrue(player, player)) {
+                        logger::info("Aaaaaa 1held condition is true.");
+                         PlayIdleAnimation(player, BlockRelease);
+                     }
+                     player->SetGraphVariableInt("BFCONG_Block", 1);
+                     releaseBlock = true;
 
-                    if (releasedBlockKey && Settings::_isCurrentlyBlocking) {
-                        Settings::_isCurrentlyBlocking = false;
-                        player->NotifyAnimationGraph("MCO_EndAnimation");
-                        player->SetGraphVariableInt("BFCO_IsPlayerInputOK", 0);
-                        player->SetGraphVariableInt("ADTF_ShouldDelay", 0);
-                        player->SetGraphVariableInt("BFCO_IsBlocking", 0);
-                        player->SetGraphVariableBool("IsBlocking", false);
-                        player->NotifyAnimationGraph("blockStop");
-                        if (BlockRelease->conditions.IsTrue(player, player)) {
-                            logger::info("Aaaaaa 1held condition is true.");
-                            PlayIdleAnimation(player, BlockRelease);
-                        }
-                        
-
-                    }
-                }
+                 }
+             }
          }
 
         if (buttonEvent->IsDown()) {
@@ -405,7 +405,7 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                    if (Settings::disableMStaBash) {
                        Settings::_isCurrentlyBlocking = false;
                        player->SetGraphVariableBool("IsBlocking", false);
-                       player->SetGraphVariableInt("BFCO_IsBlocking", 0);
+                       player->SetGraphVariableInt("BFCONG_Block", 0);
                        player->NotifyAnimationGraph("blockStop");
                        PerformAction(NormalAttack, player);
                    }
@@ -645,12 +645,7 @@ RE::BSEventNotifyControl GlobalControl::AnimationEventHandler::ProcessEvent(
     const std::string_view eventName = a_event->tag;
     
     if (a_event && a_event->holder && a_event->holder->IsPlayerRef()) {
-        auto* AutoAA = GetIdleByFormID(0x83A, pluginName);
-        if (!Settings::_isCurrentlyBlocking && player->IsBlocking()) {
-            PlayIdleAnimation(player, BlockRelease);
-            //player->NotifyAnimationGraph("blockStop");
-        }
-
+		bool relBlock = false;
         if (eventName == "Bfco_AttackStartFX") {
             player->SetGraphVariableInt("NEW_BFCO_IsNormalAttacking", 0);
             player->SetGraphVariableInt("NEW_BFCO_IsPowerAttacking", 0);
@@ -669,6 +664,19 @@ RE::BSEventNotifyControl GlobalControl::AnimationEventHandler::ProcessEvent(
             player->SetGraphVariableInt("BFCONG_PARMB", 0);
 
           }
+        else if (eventName == "attackStop") {
+            relBlock = true;
+        }
+
+        if (!Settings::_isCurrentlyBlocking && relBlock && releaseBlock) {
+           player->SetGraphVariableInt("BFCONG_Block", 0);
+           PlayIdleAnimation(player, BlockRelease);
+           //player->NotifyAnimationGraph("blockStop");
+           releaseBlock = false;
+           relBlock = false;
+		   player->SetGraphVariableInt("BFCONG_Block", 1);
+        }
+
         /*else if(eventName == "CastStop" && !Settings::_isCurrentlyBlocking) {
             player->NotifyAnimationGraph("tailCombatIdle");
 		} */  
