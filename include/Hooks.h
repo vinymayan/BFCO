@@ -7,6 +7,39 @@
 #include <map>
 #include <string>
 #include <chrono>
+
+extern const std::string pluginName;
+extern const std::string skyrim;
+extern const std::string update;
+extern const std::string dragon;
+
+extern RE::BGSAction* PowerRight;
+extern RE::BGSAction* Draw;
+extern RE::BGSAction* Seath;
+extern RE::BGSAction* PowerStanding;
+extern RE::BGSAction* PowerLeft;
+extern RE::BGSAction* PowerDual;
+extern RE::BGSAction* NormalAttack;
+extern RE::BGSAction* RightAttack;
+extern RE::BGSAction* PowerAttack;
+extern RE::BGSAction* Bash;
+
+extern RE::TESIdleForm* PowerNormal;
+extern RE::TESIdleForm* AutoAA;
+extern RE::TESIdleForm* AutoAABow;
+extern RE::TESIdleForm* PowerH2H;
+extern RE::TESIdleForm* PowerBash;
+extern RE::TESIdleForm* SprintPower;
+extern RE::TESIdleForm* ComboAttackE;
+extern RE::TESIdleForm* BlockStart;
+extern RE::TESIdleForm* BashStart;
+extern RE::TESIdleForm* BashRelease;
+extern RE::TESIdleForm* BlockRelease;
+extern RE::TESIdleForm* Dodge;
+extern RE::TESIdleForm* TailSmash;
+
+RE::TESIdleForm* GetIdleByFormID(RE::FormID a_formID, const std::string& a_pluginName);
+
 class AnimationEventHandler : public RE::BSTEventSink<RE::BSAnimationGraphEvent> {
 public:
     static AnimationEventHandler* GetSingleton() {
@@ -47,16 +80,6 @@ private:
 };
 
 
-extern RE::BGSAction* PowerRight;
-extern RE::BGSAction* Draw;
-extern RE::BGSAction* Seath;
-extern RE::BGSAction* PowerStanding;
-extern RE::BGSAction* PowerLeft;
-extern RE::BGSAction* PowerDual;
-extern RE::BGSAction* NormalAttack;
-extern RE::BGSAction* RightAttack;
-extern RE::BGSAction* PowerAttack;
-extern RE::BGSAction* Bash;
 
 void GetAttackKeys();
 

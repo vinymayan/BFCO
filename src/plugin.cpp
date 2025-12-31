@@ -24,6 +24,21 @@ void OnMessage(SKSE::MessagingInterface::Message* msg) {
             RightAttack = RE::TESForm::LookupByID<RE::BGSAction>(0x13004);
             PowerAttack = RE::TESForm::LookupByID<RE::BGSAction>(0xE8456);
             Bash = RE::TESForm::LookupByID<RE::BGSAction>(0x1B417);
+
+            PowerNormal = GetIdleByFormID(0x8C5, pluginName);
+            AutoAA = GetIdleByFormID(0x83A, pluginName);
+            AutoAABow = GetIdleByFormID(0x8FA, pluginName);
+            PowerH2H = GetIdleByFormID(0x839, pluginName);
+            PowerBash = GetIdleByFormID(0x8C0, pluginName);
+            SprintPower = GetIdleByFormID(0x8BE, pluginName);
+            ComboAttackE = GetIdleByFormID(0x8BF, pluginName);
+            BlockStart = GetIdleByFormID(0x13217, skyrim);
+            BashStart = GetIdleByFormID(0x1B417, skyrim);
+            BashRelease = GetIdleByFormID(0x1457A, skyrim);
+            BlockRelease = GetIdleByFormID(0x13ACA, skyrim);
+            Dodge = GetIdleByFormID(0x935, pluginName);
+            TailSmash = GetIdleByFormID(0x11ED35, dragon);
+
             BFCOMenu::LoadSettings();
             BFCOMenu::Register();
        }
