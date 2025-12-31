@@ -350,7 +350,7 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                     player->NotifyAnimationGraph("MCO_EndAnimation");
                     player->SetGraphVariableInt("BFCONG_Block", 1);
                     player->SetGraphVariableBool("IsBlocking", true);
-
+                    player->NotifyAnimationGraph("blockStart");
                     PlayIdleAnimation(player, BlockStart);
                     //PerformAction(ReleaseBlock, player);
              }
@@ -376,9 +376,9 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                      player->SetGraphVariableInt("ADTF_ShouldDelay", 0);
                      player->SetGraphVariableInt("BFCONG_Block", 0);
                      player->SetGraphVariableBool("IsBlocking", false);
-                     //player->NotifyAnimationGraph("blockStop");
+                     player->NotifyAnimationGraph("blockStop");
                      if (BlockRelease->conditions.IsTrue(player, player)) {
-                        logger::info("Aaaaaa 1held condition is true.");
+                        //logger::info("Aaaaaa 1held condition is true.");
                          PlayIdleAnimation(player, BlockRelease);
                      }
                      player->SetGraphVariableInt("BFCONG_Block", 1);
@@ -670,8 +670,9 @@ RE::BSEventNotifyControl GlobalControl::AnimationEventHandler::ProcessEvent(
 
         if (!Settings::_isCurrentlyBlocking && relBlock && releaseBlock) {
            player->SetGraphVariableInt("BFCONG_Block", 0);
+           player->NotifyAnimationGraph("blockStop");
            PlayIdleAnimation(player, BlockRelease);
-           //player->NotifyAnimationGraph("blockStop");
+           
            releaseBlock = false;
            relBlock = false;
 		   player->SetGraphVariableInt("BFCONG_Block", 1);
