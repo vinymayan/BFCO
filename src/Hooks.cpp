@@ -441,7 +441,7 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                    }
                    
                }
-               
+
                 
             }
             if (Settings::bEnablePowerAttack) {
@@ -449,7 +449,30 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                     if (currentStamina <= 0) {
                         return RE::BSEventNotifyControl::kContinue;
                     }
-                    if (Settings::PowerAttackKey_m == Settings::AttackKeyLeft_m || Settings::PowerAttackKey_g == Settings::AttackKeyLeft_g || Settings::PowerAttackKey_k == Settings::AttackKeyLeft_k) {
+
+                    // --- NOVA LÓGICA DE VALIDAÇÃO DA MÃO ESQUERDA ---
+                    uint32_t currentPAKey = 0;
+                    uint32_t currentPAMod = 0;
+                    uint32_t currentLAttack = 0;
+
+                    // Identificamos as teclas baseadas no dispositivo atual do evento
+                    if (device == RE::INPUT_DEVICE::kKeyboard) {
+                        currentPAKey = Settings::PowerAttackKey_k;
+                        currentPAMod = Settings::PowerAttackKey_k_mod;
+                        currentLAttack = Settings::AttackKeyLeft_k;
+                    }
+                    else if (device == RE::INPUT_DEVICE::kMouse) {
+                        currentPAKey = Settings::PowerAttackKey_m;
+                        currentPAMod = Settings::PowerAttackKey_m_mod;
+                        currentLAttack = Settings::AttackKeyLeft_m;
+                    }
+                    else if (device == RE::INPUT_DEVICE::kGamepad) {
+                        currentPAKey = Settings::PowerAttackKey_g;
+                        currentPAMod = Settings::PowerAttackKey_g_mod;
+                        currentLAttack = Settings::AttackKeyLeft_g;
+                    }
+
+                    if (currentPAMod == 0 && currentPAKey == currentLAttack) {
                         if (IsLeftHandNotWeapon(player)) {
                             return RE::BSEventNotifyControl::kContinue;
                         }
