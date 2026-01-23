@@ -222,6 +222,19 @@ bool IsLeftHandNotWeapon(RE::Actor* a_actor) {
     return true;
 }
 
+bool IsRightHandSpell(RE::Actor* a_actor) {
+    if (!a_actor) return false;
+
+    // O argumento 'false' pega a mão direita (Main Hand)
+    auto equippedObj = a_actor->GetEquippedObject(false);
+
+    // Se houver objeto e for do tipo Spell (Magia)
+    if (equippedObj && equippedObj->GetFormType() == RE::FormType::Spell) {
+        return true;
+    }
+    return false;
+}
+
 RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const* a_event,
                                                           RE::BSTEventSource<RE::InputEvent*>* a_source) {
     if (!a_event || !*a_event) {
@@ -323,7 +336,7 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
         else if (device == RE::INPUT_DEVICE::kMouse) isLAttackBtnPressed = (keyCode == Settings::AttackKeyLeft_m);
         else if (device == RE::INPUT_DEVICE::kGamepad) isLAttackBtnPressed = (keyCode == Settings::AttackKeyLeft_g);
 
-       
+        
        
            
         int isStrong = false;
@@ -386,6 +399,13 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
 
                  }
              }
+         }
+         if (IsRightHandSpell(player)) {
+             isAttackBtnPressed = false;
+             isLAttackBtnPressed = false;
+             isPowerAttackKeyPressed = false;
+             comboKeyPressed = false;
+             return RE::BSEventNotifyControl::kContinue;
          }
 
         if (buttonEvent->IsDown()) {
