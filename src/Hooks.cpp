@@ -199,27 +199,21 @@ void GetAttackKeys() {
 	logger::info("AttackKeyLeft_g (before conversion): {}", Settings::AttackKeyLeft_g);
 }
 
-bool IsLeftHandNotWeapon(RE::Actor* a_actor) {
+RE::FormType GetLeftHandFormType(RE::Actor* a_actor) {
     if (!a_actor) {
-        return true;
+        return RE::FormType::None;
     }
 
-    // O argumento 'true' em GetEquippedObject pega a mão esquerda.
+    // O argumento 'true' pega a mão esquerda.
     auto equippedObj = a_actor->GetEquippedObject(true);
 
-    // Se não houver objeto equipado (nullptr), a mão está vazia, logo não é arma.
+    // Se não houver objeto, retorna None (mão vazia).
     if (!equippedObj) {
-        return false;
+        return RE::FormType::None;
     }
 
-    // Verifica se o tipo do formulário é Weapon (Arma).
-    // Se for Weapon, retorna false (porque queremos verificar se NÃO é uma arma).
-    if (equippedObj->GetFormType() == RE::FormType::Weapon) {
-        return false;
-    }
-
-    // Se chegou aqui, é porque é Escudo, Magia, Tocha ou outro item que não seja arma.
-    return true;
+    // Retorna o tipo do formulário (Weapon, Spell, Armor/Shield, etc.)
+    return equippedObj->GetFormType();
 }
 
 bool IsRightHandSpell(RE::Actor* a_actor) {
@@ -336,7 +330,9 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
         else if (device == RE::INPUT_DEVICE::kMouse) isLAttackBtnPressed = (keyCode == Settings::AttackKeyLeft_m);
         else if (device == RE::INPUT_DEVICE::kGamepad) isLAttackBtnPressed = (keyCode == Settings::AttackKeyLeft_g);
 
-        
+        if (isLAttackBtnPressed && GetLeftHandFormType(player) == RE::FormType::Spell) {
+            return RE::BSEventNotifyControl::kContinue;
+        }
        
            
         int isStrong = false;
@@ -352,7 +348,7 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
      
          if (isBlockBtnPressed) {
              if (Settings::disableDualblock) {
-                 if (IsLeftHandNotWeapon(player)) {
+                 if (GetLeftHandFormType(player) != RE::FormType::Weapon) {
                      return RE::BSEventNotifyControl::kContinue;
                  }
              }
@@ -493,7 +489,7 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
                     }
 
                     if (currentPAMod == 0 && currentPAKey == currentLAttack) {
-                        if (IsLeftHandNotWeapon(player)) {
+                        if (GetLeftHandFormType(player) != RE::FormType::Weapon) {
                             return RE::BSEventNotifyControl::kContinue;
                         }
                     }
