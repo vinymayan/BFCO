@@ -1,7 +1,7 @@
-{
+﻿{
   "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
-  "name": "bfcoskse",
-  "version-string": "1.5.0.0",
+  "name": "bfco",
+  "version-string": "0.1.0.0",
   "dependencies": [
     "fast-cpp-csv-parser",
     "rsm-binary-io",
@@ -10,7 +10,6 @@
     "rapidcsv",
     "clib-util",
     "clib-utils-qtr",
-    "skyprompt-api",
     "directxtk",
     "skse-mcp",
     "rapidjson"
@@ -21,5 +20,5 @@
       "version": "9.1.0"
     }
   ],
-  "builtin-baseline": "ee12231b20c95013c6638d845d04c91559a1d1ff"
+  "builtin-baseline": "74e6536215718009aae747d86d84b78376bf9e09"
 }

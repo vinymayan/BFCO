@@ -1,207 +1,143 @@
-#include <Windows.h>
+ï»¿#include <Windows.h>
 #include <map>
 #include <string>
 #include "SKSEMCP/SKSEMenuFramework.hpp"
+#include "InputManagerAPI.h"
+
+inline const char* actionStateNames[] = { "Ignore", "Tap", "Hold", "Gesture" };
+
+constexpr uint32_t MOUSE_OFFSET = 256;
+constexpr uint32_t GAMEPAD_OFFSET = 266;
+
+inline const char* pcKeyNames[] = {
+    "None",
+    // Mouse
+    "Mouse 1 (Left)", "Mouse 2 (Right)", "Mouse 3 (Middle)", "Mouse 4", "Mouse 5", "Mouse 6", "Mouse 7", "Mouse 8",
+    "Mouse Wheel Up", "Mouse Wheel Down",
+    // Alfabeto
+    "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z",
+    // NÃºmeros
+    "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
+    // PontuaÃ§Ã£o e SÃ­mbolos
+    "Minus ( - )", "Equals ( = )", "Bracket Left ( [ )", "Bracket Right ( ] )", "Semicolon ( ; )", "Apostrophe ( ' )", "Tilde ( ~ )", "Backslash ( \\ )", "Comma ( , )", "Period ( . )", "Slash ( / )",
+    // F-Keys
+    "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12",
+    // Especiais e Modificadores
+    "Esc", "Tab", "Caps Lock", "Shift (Left)", "Shift (Right)", "Ctrl (Left)", "Ctrl (Right)", "Alt (Left)", "Alt (Right)",
+    "Space", "Enter", "Backspace", "Print Screen", "Scroll Lock", "Pause", "Num Lock",
+    // NavegaÃ§Ã£o
+    "Up Arrow", "Down Arrow", "Left Arrow", "Right Arrow", "Insert", "Delete", "Home", "End", "Page Up", "Page Down",
+    // Numpad
+    "Num 0", "Num 1", "Num 2", "Num 3", "Num 4", "Num 5", "Num 6", "Num 7", "Num 8", "Num 9",
+    "Num +", "Num -", "Num *", "Num /", "Num Enter", "Num Dot"
+};
+
+inline const int pcKeyIDs[] = {
+    0,
+    // Mouse (Base + 256)
+    RE::BSWin32MouseDevice::Keys::kLeftButton + MOUSE_OFFSET, RE::BSWin32MouseDevice::Keys::kRightButton + MOUSE_OFFSET,
+    RE::BSWin32MouseDevice::Keys::kMiddleButton + MOUSE_OFFSET, RE::BSWin32MouseDevice::Keys::kButton3 + MOUSE_OFFSET,
+    RE::BSWin32MouseDevice::Keys::kButton4 + MOUSE_OFFSET, RE::BSWin32MouseDevice::Keys::kButton5 + MOUSE_OFFSET,
+    RE::BSWin32MouseDevice::Keys::kButton6 + MOUSE_OFFSET, RE::BSWin32MouseDevice::Keys::kButton7 + MOUSE_OFFSET,
+    RE::BSWin32MouseDevice::Keys::kWheelUp + MOUSE_OFFSET, RE::BSWin32MouseDevice::Keys::kWheelDown + MOUSE_OFFSET,
+    // Alfabeto
+    RE::BSKeyboardDevice::Keys::kA, RE::BSKeyboardDevice::Keys::kB, RE::BSKeyboardDevice::Keys::kC, RE::BSKeyboardDevice::Keys::kD,
+    RE::BSKeyboardDevice::Keys::kE, RE::BSKeyboardDevice::Keys::kF, RE::BSKeyboardDevice::Keys::kG, RE::BSKeyboardDevice::Keys::kH,
+    RE::BSKeyboardDevice::Keys::kI, RE::BSKeyboardDevice::Keys::kJ, RE::BSKeyboardDevice::Keys::kK, RE::BSKeyboardDevice::Keys::kL,
+    RE::BSKeyboardDevice::Keys::kM, RE::BSKeyboardDevice::Keys::kN, RE::BSKeyboardDevice::Keys::kO, RE::BSKeyboardDevice::Keys::kP,
+    RE::BSKeyboardDevice::Keys::kQ, RE::BSKeyboardDevice::Keys::kR, RE::BSKeyboardDevice::Keys::kS, RE::BSKeyboardDevice::Keys::kT,
+    RE::BSKeyboardDevice::Keys::kU, RE::BSKeyboardDevice::Keys::kV, RE::BSKeyboardDevice::Keys::kW, RE::BSKeyboardDevice::Keys::kX,
+    RE::BSKeyboardDevice::Keys::kY, RE::BSKeyboardDevice::Keys::kZ,
+    // NÃºmeros
+    RE::BSKeyboardDevice::Keys::kNum1, RE::BSKeyboardDevice::Keys::kNum2, RE::BSKeyboardDevice::Keys::kNum3, RE::BSKeyboardDevice::Keys::kNum4,
+    RE::BSKeyboardDevice::Keys::kNum5, RE::BSKeyboardDevice::Keys::kNum6, RE::BSKeyboardDevice::Keys::kNum7, RE::BSKeyboardDevice::Keys::kNum8,
+    RE::BSKeyboardDevice::Keys::kNum9, RE::BSKeyboardDevice::Keys::kNum0,
+    // PontuaÃ§Ã£o e SÃ­mbolos
+    RE::BSKeyboardDevice::Keys::kMinus, RE::BSKeyboardDevice::Keys::kEquals, RE::BSKeyboardDevice::Keys::kBracketLeft,
+    RE::BSKeyboardDevice::Keys::kBracketRight, RE::BSKeyboardDevice::Keys::kSemicolon, RE::BSKeyboardDevice::Keys::kApostrophe,
+    RE::BSKeyboardDevice::Keys::kTilde, RE::BSKeyboardDevice::Keys::kBackslash, RE::BSKeyboardDevice::Keys::kComma,
+    RE::BSKeyboardDevice::Keys::kPeriod, RE::BSKeyboardDevice::Keys::kSlash,
+    // F-Keys
+    RE::BSKeyboardDevice::Keys::kF1, RE::BSKeyboardDevice::Keys::kF2, RE::BSKeyboardDevice::Keys::kF3, RE::BSKeyboardDevice::Keys::kF4,
+    RE::BSKeyboardDevice::Keys::kF5, RE::BSKeyboardDevice::Keys::kF6, RE::BSKeyboardDevice::Keys::kF7, RE::BSKeyboardDevice::Keys::kF8,
+    RE::BSKeyboardDevice::Keys::kF9, RE::BSKeyboardDevice::Keys::kF10, RE::BSKeyboardDevice::Keys::kF11, RE::BSKeyboardDevice::Keys::kF12,
+    // Especiais e Modificadores
+    RE::BSKeyboardDevice::Keys::kEscape, RE::BSKeyboardDevice::Keys::kTab, RE::BSKeyboardDevice::Keys::kCapsLock,
+    RE::BSKeyboardDevice::Keys::kLeftShift, RE::BSKeyboardDevice::Keys::kRightShift,
+    RE::BSKeyboardDevice::Keys::kLeftControl, RE::BSKeyboardDevice::Keys::kRightControl,
+    RE::BSKeyboardDevice::Keys::kLeftAlt, RE::BSKeyboardDevice::Keys::kRightAlt,
+    RE::BSKeyboardDevice::Keys::kSpacebar, RE::BSKeyboardDevice::Keys::kEnter, RE::BSKeyboardDevice::Keys::kBackspace,
+    RE::BSKeyboardDevice::Keys::kPrintScreen, RE::BSKeyboardDevice::Keys::kScrollLock, RE::BSKeyboardDevice::Keys::kPause,
+    RE::BSKeyboardDevice::Keys::kNumLock,
+    // NavegaÃ§Ã£o
+    RE::BSKeyboardDevice::Keys::kUp, RE::BSKeyboardDevice::Keys::kDown, RE::BSKeyboardDevice::Keys::kLeft, RE::BSKeyboardDevice::Keys::kRight,
+    RE::BSKeyboardDevice::Keys::kInsert, RE::BSKeyboardDevice::Keys::kDelete, RE::BSKeyboardDevice::Keys::kHome, RE::BSKeyboardDevice::Keys::kEnd,
+    RE::BSKeyboardDevice::Keys::kPageUp, RE::BSKeyboardDevice::Keys::kPageDown,
+    // Numpad
+    RE::BSKeyboardDevice::Keys::kKP_0, RE::BSKeyboardDevice::Keys::kKP_1, RE::BSKeyboardDevice::Keys::kKP_2, RE::BSKeyboardDevice::Keys::kKP_3,
+    RE::BSKeyboardDevice::Keys::kKP_4, RE::BSKeyboardDevice::Keys::kKP_5, RE::BSKeyboardDevice::Keys::kKP_6, RE::BSKeyboardDevice::Keys::kKP_7,
+    RE::BSKeyboardDevice::Keys::kKP_8, RE::BSKeyboardDevice::Keys::kKP_9,
+    RE::BSKeyboardDevice::Keys::kKP_Plus, RE::BSKeyboardDevice::Keys::kKP_Subtract, RE::BSKeyboardDevice::Keys::kKP_Multiply,
+    RE::BSKeyboardDevice::Keys::kKP_Divide, RE::BSKeyboardDevice::Keys::kKP_Enter, RE::BSKeyboardDevice::Keys::kKP_Decimal
+};
+
+inline const char* gamepadKeyNames[] = {
+    "None",
+    "D-Pad Up", "D-Pad Down", "D-Pad Left", "D-Pad Right",
+    "Start / Options", "Back / Share / Select", "LS / L3 (Left Stick)", "RS / R3 (Right Stick)",
+    "LB / L1 (Left Bumper)", "RB / R1 (Right Bumper)",
+    "LT / L2 (Left Trigger)", "RT / R2 (Right Trigger)",
+    "A / Cross", "B / Circle", "X / Square", "Y / Triangle"
+};
+
+inline const int gamepadKeyIDs[] = {
+    0,
+    RE::BSWin32GamepadDevice::Keys::kUp + GAMEPAD_OFFSET,
+    RE::BSWin32GamepadDevice::Keys::kDown + GAMEPAD_OFFSET,
+    RE::BSWin32GamepadDevice::Keys::kLeft + GAMEPAD_OFFSET,
+    RE::BSWin32GamepadDevice::Keys::kRight + GAMEPAD_OFFSET,
+    RE::BSWin32GamepadDevice::Keys::kStart + GAMEPAD_OFFSET,
+    RE::BSWin32GamepadDevice::Keys::kBack + GAMEPAD_OFFSET,
+    RE::BSWin32GamepadDevice::Keys::kLeftThumb + GAMEPAD_OFFSET,
+    RE::BSWin32GamepadDevice::Keys::kRightThumb + GAMEPAD_OFFSET,
+    RE::BSWin32GamepadDevice::Keys::kLeftShoulder + GAMEPAD_OFFSET,
+    RE::BSWin32GamepadDevice::Keys::kRightShoulder + GAMEPAD_OFFSET,
+    RE::BSWin32GamepadDevice::Keys::kLeftTrigger + GAMEPAD_OFFSET,
+    RE::BSWin32GamepadDevice::Keys::kRightTrigger + GAMEPAD_OFFSET,
+    RE::BSWin32GamepadDevice::Keys::kA + GAMEPAD_OFFSET,
+    RE::BSWin32GamepadDevice::Keys::kB + GAMEPAD_OFFSET,
+    RE::BSWin32GamepadDevice::Keys::kX + GAMEPAD_OFFSET,
+    RE::BSWin32GamepadDevice::Keys::kY + GAMEPAD_OFFSET
+};
 
 namespace Settings {
     // Checkboxes (baseado no seu MCM)
-    inline bool _isCurrentlyBlocking = false;
-    inline bool DodgeCancel = false;
-    inline bool CanPA = false;
     inline bool bEnableComboAttack = true;
     inline bool bEnableDirectionalAttack = false;
     inline bool bEnablePowerAttack = true;
-    //inline bool bEnableLmbPowerAttack = false;
-    //inline bool bEnableRmbPowerAttack = false;
     inline bool bDisableJumpingAttack = false;
     inline int bPowerAttackLMB = 0;
-    inline bool bAutoAA = true;
-
-    // Keybinds (separados para teclado e controle)
-    // Os valores padrão podem ser ajustados conforme necessário. Usei códigos de tecla comuns.
-    inline uint32_t comboKey_k = 47;  // V
-    inline uint32_t comboKey_k_mod = 0; // Modificador (Ex: Ctrl)
-
-    inline uint32_t comboKey_m = 0;
-    inline uint32_t comboKey_m_mod = 0;
-
-    inline uint32_t comboKey_g = 265;  // RB / R1
-    inline uint32_t comboKey_g_mod = 0;
-
-    // Power Attack
-    inline uint32_t PowerAttackKey_k = 18;  // E
-    inline uint32_t PowerAttackKey_k_mod = 0;
-
-    inline uint32_t PowerAttackKey_m = 0;
-    inline uint32_t PowerAttackKey_m_mod = 0;
-
-    inline uint32_t PowerAttackKey_g = 512;  // LB / L1
-    inline uint32_t PowerAttackKey_g_mod = 0;
-
-    // Block
-    inline uint32_t BlockKey_k = -1;
-    inline uint32_t BlockKey_k_mod = 0;
-
-    inline uint32_t BlockKey_m = -3;
-    inline uint32_t BlockKey_m_mod = 0;
-
-    inline uint32_t BlockKey_g = -2;
-    inline uint32_t BlockKey_g_mod = 0;
-
-    // Attack (Se precisar no futuro)
-    inline uint32_t AttackKey_k = -1;
-    inline uint32_t AttackKey_m = -3;
-    inline uint32_t AttackKey_g = -2;
-
-    inline uint32_t AttackKeyLeft_k = -1;
-    inline uint32_t AttackKeyLeft_m = -3;
-    inline uint32_t AttackKeyLeft_g = -2;
-
-    inline bool hasCMF = false;
-    inline bool lockSprintAttack = false;
-    inline bool disableMStaBash = false;
-    inline bool disableDualblock = false;
+    static inline bool bInstantBlock = true;
+    static inline int AnimationType = 0;
+    inline int PowerAttackActionID = -1;
+    inline int ComboActionID = -1;
+    inline int ComboInputType = 0;        // 0 = Action, 1 = Motion
+    inline int ComboMotionID = -1;
+    inline int PowerAttackInputType = 0;  // 0 = Action, 1 = Motion
+    inline int PowerAttackMotionID = -1;
 }
 
-// Namespace para organizar as funções do nosso menu
+// Namespace para organizar as funÃ§Ãµes do nosso menu
 namespace BFCOMenu {
     // Registra o menu no SKSE Menu Framework
     void Register();
 
-    // Funções para salvar e carregar as configurações de um arquivo JSON
+    // FunÃ§Ãµes para salvar e carregar as configuraÃ§Ãµes de um arquivo JSON
     void LoadSettings();
     void SaveSettings();
 
-    // Função que aplica as configurações carregadas/salvas às Variáveis Globais do jogo
+    // FunÃ§Ã£o que aplica as configuraÃ§Ãµes carregadas/salvas Ã s VariÃ¡veis Globais do jogo
     void UpdateGameGlobals();
     inline RE::TESGlobal* g_targetGlobal = nullptr;
 }
 
-
-
-const std::map<int, const char*> g_gamepad_dx_to_name_map = {
-    {0, "[Nenhuma]"},
-    {1, "DPad Up"},
-    {2, "DPad Down"},
-    {4, "DPad Left"},
-    {8, "DPad Right"},
-    {16, "Start"},
-    {32, "Back"},
-    {64, "L3"},
-    {128, "R3"},
-    {256, "LB"},
-    {512, "RB"},
-    {4096, "A / X"},
-    {8192, "B / O"},
-    {16384, "X / Square"},
-    {32768, "Y / Triangle"},
-    {9, "LT/L2"},
-    {10, "RT/R2"}};
-
-// MAPA 2: Converte o Scan Code do DirectX para um Nome (o que você precisa exibir) - O seu mapa original.
-const std::map<int, const char*> g_dx_to_name_map = {
-    {0, "[Nenhuma]"},
-    {1, "Escape"},
-    {2, "1"},
-    {3, "2"},
-    {4, "3"},
-    {5, "4"},
-    {6, "5"},
-    {7, "6"},
-    {8, "7"},
-    {9, "8"},
-    {10, "9"},
-    {11, "0"},
-    {12, "-"},
-    {13, "="},
-    {14, "Backspace"},
-    {15, "Tab"},
-    {16, "Q"},
-    {17, "W"},
-    {18, "E"},
-    {19, "R"},
-    {20, "T"},
-    {21, "Y"},
-    {22, "U"},
-    {23, "I"},
-    {24, "O"},
-    {25, "P"},
-    {28, "Enter"},
-    {29, "Left Ctrl"},
-    {30, "A"},
-    {31, "S"},
-    {32, "D"},
-    {33, "F"},
-    {34, "G"},
-    {35, "H"},
-    {36, "J"},
-    {37, "K"},
-    {38, "L"},
-    {39, ";"},
-    {42, "Left Shift"},
-    {43, "\\"},
-    {44, "Z"},
-    {45, "X"},
-    {46, "C"},
-    {47, "V"},
-    {48, "B"},
-    {49, "N"},
-    {50, "M"},
-    {51, ","},
-    {52, "."},
-    {53, "/"},
-    {54, "Right Shift"},
-    {56, "Left Alt"},
-    {57, "Spacebar"},
-    {59, "F1"},
-    {60, "F2"},
-    {61, "F3"},
-    {62, "F4"},
-    {63, "F5"},
-    {64, "F6"},
-    {65, "F7"},
-    {66, "F8"},
-    {67, "F9"},
-    {68, "F10"},
-    {87, "F11"},
-    {88, "F12"},
-    {156, "Keypad Enter"},
-    {157, "Right Ctrl"},
-    {184, "Right Alt"},
-    {199, "Home"},
-    {200, "Up Arrow"},
-    {201, "PgUp"},
-    {203, "Left Arrow"},
-    {205, "Right Arrow"},
-    {207, "End"},
-    {208, "Down Arrow"},
-    {209, "PgDown"},
-    {210, "Insert"},
-    {211, "Delete"},
-    {256, "Left Click"},
-    {257, "Right Click"},
-    {258, "Middle Mouse Button"},
-    {259, "Mouse 4"},
-    {260, "Mouse 5"},
-    {261, "Mouse 6"},
-    {262, "Mouse 7"},
-    {263, "Mouse 8"},
-    {55, "Keypad *"}, 
-    {181, "Keypad /"},
-    {74, "Keypad -"},  // <-- ADICIONADO
-    {78, "Keypad +"},  // <-- ADICIONADO
-    {73, "Keypad 9"},  // <-- ADICIONADO
-    {72, "Keypad 8"},  // <-- ADICIONADO
-    {71, "Keypad 7"},  // <-- ADICIONADO
-    {77, "Keypad 6"},  // <-- ADICIONADO
-    {76, "Keypad 5"},  // <-- ADICIONADO
-    {75, "Keypad 4"},  // <-- ADICIONADO
-    {81, "Keypad 3"},  // <-- ADICIONADO
-    {80, "Keypad 2"},  // <-- ADICIONADO
-    {79, "Keypad 1"},  // <-- ADICIONADO
-    {82, "Keypad 0"},  // <-- ADICIONADO
-    {83, "Keypad ."},  // <-- ADICIONADO
-    //{261, "Scroll Up"},
-    //{262, "Scroll Down"}
-    // Adicionei a key 0 para o caso "Nenhuma" para simplificar.
-};
