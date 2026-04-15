@@ -573,7 +573,7 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(const SKSE::ModCallbac
 
 		// Verifica se o Combo está configurado como Action (0)
 		if (Settings::ComboInputType == 0 && inputID == Settings::ComboActionID) {
-			SKSE::log::info("Combo Attack (Action) Triggered!");
+			//SKSE::log::info("Combo Attack (Action) Triggered!");
 			if (BFCOIdles::SprintPower->conditions.IsTrue(player, player)) {
 				player->NotifyAnimationGraph("MCO_EndAnimation");
 				BFCOIdles::PlayIdleAnimation(player, BFCOIdles::SprintPower);
@@ -591,7 +591,7 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(const SKSE::ModCallbac
 
 		// Verifica se o Power Attack está configurado como Action (0)
 		if (Settings::PowerAttackInputType == 0 && inputID == Settings::PowerAttackActionID) {
-			SKSE::log::info("Power Attack (Action) Triggered!");
+			//SKSE::log::info("Power Attack (Action) Triggered!");
 			player->NotifyAnimationGraph("MCO_EndAnimation");
 
 			auto playDirectionalPowerAttack = [](RE::Actor* p) {
@@ -665,7 +665,7 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(const SKSE::ModCallbac
 
 		// Verifica se o Combo está configurado como Motion (1)
 		if (Settings::ComboInputType == 1 && inputID == Settings::ComboMotionID) {
-			SKSE::log::info("Combo Attack (Motion) Triggered!");
+			//SKSE::log::info("Combo Attack (Motion) Triggered!");
 			if (BFCOIdles::SprintPower->conditions.IsTrue(player, player)) {
 				player->NotifyAnimationGraph("MCO_EndAnimation");
 				BFCOIdles::PlayIdleAnimation(player, BFCOIdles::SprintPower);
@@ -683,7 +683,7 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(const SKSE::ModCallbac
 
 		// Verifica se o Power Attack está configurado como Motion (1)
 		if (Settings::PowerAttackInputType == 1 && inputID == Settings::PowerAttackMotionID) {
-			SKSE::log::info("Power Attack (Motion) Triggered!");
+			//SKSE::log::info("Power Attack (Motion) Triggered!");
 			player->NotifyAnimationGraph("MCO_EndAnimation");
 
 			auto playDirectionalPowerAttack = [](RE::Actor* p) {

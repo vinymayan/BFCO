@@ -33,6 +33,7 @@ public:
 		return &singleton;
 	}
 	static inline bool scar = false;
+	static inline bool CMF = false;
 	static void InstallHooks()
 	{
 		Hooks::Install();
