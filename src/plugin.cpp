@@ -37,6 +37,25 @@ void OnMessage(SKSE::MessagingInterface::Message* message) {
             logger::info("CycleMovesets.dll not found.");
         }
 		BFCOMenu::Register();
+        if (InputManagerAPI::_API) {
+            if (Settings::bEnableComboAttack) {
+                if (Settings::ComboInputType == 0 && Settings::ComboActionID != -1) {
+                    InputManagerAPI::_API->UpdateListener(0, Settings::ComboActionID, "BFCO", "Combo Attack", true);
+                }
+                else if (Settings::ComboInputType == 1 && Settings::ComboMotionID != -1) {
+                    InputManagerAPI::_API->UpdateListener(1, Settings::ComboMotionID, "BFCO", "Combo Attack", true);
+                }
+            }
+
+            if (Settings::bEnablePowerAttack) {
+                if (Settings::PowerAttackInputType == 0 && Settings::PowerAttackActionID != -1) {
+                    InputManagerAPI::_API->UpdateListener(0, Settings::PowerAttackActionID, "BFCO", "Power Attack", true);
+                }
+                else if (Settings::PowerAttackInputType == 1 && Settings::PowerAttackMotionID != -1) {
+                    InputManagerAPI::_API->UpdateListener(1, Settings::PowerAttackMotionID, "BFCO", "Power Attack", true);
+                }
+            }
+        }
     }
     if (message->type == SKSE::MessagingInterface::kNewGame || message->type == SKSE::MessagingInterface::kPostLoadGame) {
         RE::ScriptEventSourceHolder::GetSingleton()->AddEventSink(BFCO::Hooks::NpcCombatTracker::GetSingleton());

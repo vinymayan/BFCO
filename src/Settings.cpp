@@ -9,6 +9,72 @@ namespace BFCOMenu {
 
     // Caminho para o nosso arquivo de configurações
     const char* SETTINGS_PATH = "Data/SKSE/Plugins/BFCO_Settings.json";
+    const char* LANG_PATH = "Data/SKSE/Plugins/BFCO_Language.json";
+    static std::unordered_map<std::string, std::string> LangMap;
+
+    void LoadLanguage() {
+        LangMap.clear();
+
+        // Lê o arquivo usando fstream
+        std::ifstream file(LANG_PATH, std::ios::binary);
+        if (!file.is_open()) {
+            SKSE::log::warn("Nao foi possivel carregar BFCO_Language.json. Usando textos padroes.");
+            return;
+        }
+
+        // Passa o conteúdo do arquivo para uma std::string
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        std::string jsonStr = buffer.str();
+        file.close();
+
+        // Verifica e remove o BOM (Byte Order Mark) do UTF-8, se existir
+        if (jsonStr.size() >= 3 &&
+            (unsigned char)jsonStr[0] == 0xEF &&
+            (unsigned char)jsonStr[1] == 0xBB &&
+            (unsigned char)jsonStr[2] == 0xBF) {
+            jsonStr.erase(0, 3);
+        }
+
+        // Agora faz o parse da string limpa
+        rapidjson::Document doc;
+        doc.Parse(jsonStr.c_str());
+
+        // Loga se houver erro de sintaxe no JSON (muito útil para debugar)
+        if (doc.HasParseError()) {
+            SKSE::log::error("Erro ao analisar BFCO_Language.json (Parse Error: {} no offset {})",
+                (unsigned)doc.GetParseError(), doc.GetErrorOffset());
+            return;
+        }
+
+        if (doc.IsObject()) {
+            for (auto itr = doc.MemberBegin(); itr != doc.MemberEnd(); ++itr) {
+                if (itr->value.IsObject()) {
+                    std::string category = itr->name.GetString();
+                    for (auto jtr = itr->value.MemberBegin(); jtr != itr->value.MemberEnd(); ++jtr) {
+                        if (jtr->value.IsString()) {
+                            // Cria chaves no formato "categoria.chave" (ex: "common.save")
+                            LangMap[category + "." + jtr->name.GetString()] = jtr->value.GetString();
+                        }
+                    }
+                }
+                else if (itr->value.IsString()) {
+                    LangMap[itr->name.GetString()] = itr->value.GetString();
+                }
+            }
+        }
+
+        SKSE::log::info("Idioma carregado com {} entradas.", LangMap.size());
+    }
+
+    // Função de resgate de String Traduzida
+    const char* GetLoc(const std::string& key, const char* defaultVal) {
+        auto it = LangMap.find(key);
+        if (it != LangMap.end()) {
+            return it->second.c_str();
+        }
+        return defaultVal;
+    }
 
     inline std::string ToLower(std::string s) {
         std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
@@ -24,7 +90,7 @@ namespace BFCOMenu {
 
     inline bool SearchableCombo(const char* label, int* current_item, const char* const items[], int items_count) {
         bool changed = false;
-        const char* preview_value = (*current_item >= 0 && *current_item < items_count) ? items[*current_item] : "None";
+        const char* preview_value = (*current_item >= 0 && *current_item < items_count) ? items[*current_item] : GetLoc("common.none", "None");
 
         if (ImGuiMCP::BeginCombo(label, preview_value)) {
             static char searchBuf[128] = "";
@@ -32,7 +98,8 @@ namespace BFCOMenu {
                 searchBuf[0] = '\0';
                 ImGuiMCP::SetKeyboardFocusHere();
             }
-            ImGuiMCP::InputText("Filter...##Search", searchBuf, sizeof(searchBuf));
+            std::string searchLabel = std::string(GetLoc("common.search_placeholder", "Filter...")) + "##Search";
+            ImGuiMCP::InputText(searchLabel.c_str(), searchBuf, sizeof(searchBuf));
             ImGuiMCP::Separator();
 
             std::string searchLower = ToLower(searchBuf);
@@ -70,17 +137,20 @@ namespace BFCOMenu {
         ImGui::Text("%s", label);
 
         if (!InputManagerAPI::_API) {
-            ImGui::TextDisabled("[Input Manager nao detectado]");
+            ImGui::TextDisabled("%s", GetLoc("input.no_input_manager", "[Input Manager nao detectado]"));
             return false;
         }
 
         // --- 1. Dropdown de Tipo (Action ou Motion) ---
-        const char* typeItems[] = { "Action (Normal Input)", "Motion (Combo Sequence)" };
+        const char* typeItems[] = {
+            GetLoc("input.type_action", "Action (Normal Input)"),
+            GetLoc("input.type_motion", "Motion (Combo Sequence)")
+        };
+
         ImGui::SetNextItemWidth(200);
-        if (ImGui::BeginCombo((std::string("Input Type##") + label).c_str(), typeItems[inputType])) {
+        if (ImGui::BeginCombo((std::string(GetLoc("input.input_type", "Input Type")) + "##" + label).c_str(), typeItems[inputType])) {
             for (int i = 0; i < 2; i++) {
                 if (ImGui::Selectable(typeItems[i], inputType == i)) {
-                    // Limpa listeners antigos ao trocar o tipo
                     if (inputType == 0 && actionID != -1) InputManagerAPI::_API->UpdateListener(0, actionID, "BFCO", purpose, false);
                     if (inputType == 1 && motionID != -1) InputManagerAPI::_API->UpdateListener(1, motionID, "BFCO", purpose, false);
 
@@ -94,44 +164,44 @@ namespace BFCOMenu {
         // --- 2. Lógica para Action (Tipo 0) ---
         if (inputType == 0) {
             size_t actionCount = InputManagerAPI::_API->GetInputCount(0);
-            std::string previewValue = "[Nenhuma Acao Selecionada]";
+            std::string previewValue = GetLoc("input.no_action", "[Nenhuma Acao Selecionada]");
 
             if (actionID >= 0 && actionID < actionCount) {
                 auto info = InputManagerAPI::_API->GetActionInfo(actionID);
-                previewValue = "[" + std::to_string(actionID) + "] " + (info.name ? std::string(info.name) : "Unnamed");
+                previewValue = "[" + std::to_string(actionID) + "] " + (info.name ? std::string(info.name) : GetLoc("common.unnamed", "Unnamed"));
             }
 
             ImGui::SetNextItemWidth(250);
-            if (ImGui::BeginCombo((std::string("Select Action##") + label).c_str(), previewValue.c_str())) {
-                if (ImGui::Selectable("[Desativado]", actionID == -1)) {
+            if (ImGui::BeginCombo((std::string(GetLoc("input.select_action", "Select Action")) + "##" + label).c_str(), previewValue.c_str())) {
+                if (ImGui::Selectable(GetLoc("common.disabled", "[Desativado]"), actionID == -1)) {
                     if (actionID != -1) InputManagerAPI::_API->UpdateListener(0, actionID, "BFCO", purpose, false);
                     actionID = -1;
                     changed = true;
                 }
                 for (int i = 0; i < actionCount; ++i) {
                     auto info = InputManagerAPI::_API->GetActionInfo(i);
-                    std::string itemLabel = "[" + std::to_string(i) + "] " + (info.name ? std::string(info.name) : "Unnamed");
+                    std::string itemLabel = "[" + std::to_string(i) + "] " + (info.name ? std::string(info.name) : GetLoc("common.unnamed", "Unnamed"));
                     if (ImGui::Selectable(itemLabel.c_str(), actionID == i)) {
                         if (actionID != -1) InputManagerAPI::_API->UpdateListener(0, actionID, "BFCO", purpose, false);
                         actionID = i;
                         InputManagerAPI::_API->UpdateListener(0, actionID, "BFCO", purpose, true);
                         changed = true;
-                        current_edit_action_id = -1; // Reset do editor UI
+                        current_edit_action_id = -1;
                     }
                 }
                 ImGui::EndCombo();
             }
 
-            // ================== EDITOR DE ACTION (Com nova Lógica) ==================
+            // ================== EDITOR DE ACTION ==================
             if (actionID != -1) {
-                if (ImGui::TreeNode((std::string("Edit Keys for ") + label).c_str())) {
+                if (ImGui::TreeNode((std::string(GetLoc("input.edit_keys", "Edit Keys for ")) + label).c_str())) {
 
                     if (current_edit_action_id != actionID || current_edit_label != label) {
                         edit_info = InputManagerAPI::_API->GetActionInfo(actionID);
                         current_edit_action_id = actionID;
                         current_edit_label = label;
 
-                        strncpy_s(edit_nameBuf, edit_info.name ? edit_info.name : "Unnamed Action", sizeof(edit_nameBuf) - 1);
+                        strncpy_s(edit_nameBuf, edit_info.name ? edit_info.name : GetLoc("input.unnamed_action", "Unnamed Action"), sizeof(edit_nameBuf) - 1);
                         edit_nameBuf[sizeof(edit_nameBuf) - 1] = '\0';
 
                         ui_pcMainIdx = GetIndexFromID(edit_info.pcMainKey, pcKeyIDs, std::size(pcKeyIDs));
@@ -144,32 +214,28 @@ namespace BFCOMenu {
                         updateStatusMsg = "";
                     }
 
-                    ImGui::InputText("Input Name", edit_nameBuf, sizeof(edit_nameBuf));
+                    ImGui::InputText(GetLoc("input.input_name", "Input Name"), edit_nameBuf, sizeof(edit_nameBuf));
                     ImGui::Separator();
 
                     // --- PC ---
-                    ImGui::TextColored({ 0.4f, 0.8f, 1.0f, 1.0f }, "Keyboard and Mouse");
-                    if (SearchableCombo("PC Main Key", &ui_pcMainIdx, pcKeyNames, std::size(pcKeyNames))) {
+                    ImGui::TextColored({ 0.4f, 0.8f, 1.0f, 1.0f }, "%s", GetLoc("input.pc_header", "Keyboard and Mouse"));
+                    if (SearchableCombo(GetLoc("input.pc_main_key", "PC Main Key"), &ui_pcMainIdx, pcKeyNames, std::size(pcKeyNames))) {
                         edit_info.pcMainKey = pcKeyIDs[ui_pcMainIdx];
                     }
 
-                    // PC Main Action com verificação para resetar Mod Action se não for Hold (2)
-                    if (ImGui::Combo("PC Main Action", &edit_info.pcMainAction, actionStateNames, std::size(actionStateNames))) {
+                    if (ImGui::Combo(GetLoc("input.pc_main_action", "PC Main Action"), &edit_info.pcMainAction, actionStateNames, std::size(actionStateNames))) {
                         if (edit_info.pcMainAction != 2 && current_pcModAct == 3) {
-                            current_pcModAct = 0; // Reseta se sair de Hold e o Mod for Gesto
+                            current_pcModAct = 0;
                         }
                     }
 
-                    // AJUSTE 2: PC Main Tap Count
-                    if (edit_info.pcMainAction == 1) { // 1 = Tap
+                    if (edit_info.pcMainAction == 1) {
                         if (edit_info.pcMainTapCount < 1) edit_info.pcMainTapCount = 1;
-                        ImGui::SliderInt("PC Main Tap Amount", &edit_info.pcMainTapCount, 1, 5);
+                        ImGui::SliderInt(GetLoc("input.pc_main_tap", "PC Main Tap Amount"), &edit_info.pcMainTapCount, 1, 5);
                     }
 
-                    // AJUSTE 1: PC Mod Action (Combo customizado para esconder Gesture)
-                    if (ImGui::BeginCombo("PC Mod Action", actionStateNames[current_pcModAct])) {
+                    if (ImGui::BeginCombo(GetLoc("input.pc_mod_action", "PC Mod Action"), actionStateNames[current_pcModAct])) {
                         for (int i = 0; i < std::size(actionStateNames); i++) {
-                            // Pula a opção Gesture (3) se a Main Action não for Hold (2)
                             if (i == 3 && edit_info.pcMainAction != 2) continue;
 
                             bool is_selected = (current_pcModAct == i);
@@ -195,12 +261,12 @@ namespace BFCOMenu {
                         edit_info.pcModAction = current_pcModAct;
                     }
 
-                    if (edit_info.pcModAction == 3) { // 3 = Gesto
+                    if (edit_info.pcModAction == 3) {
                         int gestIdx = edit_info.pcModifierKey;
                         std::string gesturePreview = (gestIdx >= 0 && gestIdx < InputManagerAPI::_API->GetInputCount(2))
-                            ? InputManagerAPI::_API->GetInputName(2, gestIdx) : "[ No Gesture ]";
+                            ? InputManagerAPI::_API->GetInputName(2, gestIdx) : GetLoc("input.no_gesture", "[ No Gesture ]");
 
-                        if (ImGui::BeginCombo("PC Gesture", gesturePreview.c_str())) {
+                        if (ImGui::BeginCombo(GetLoc("input.pc_gesture", "PC Gesture"), gesturePreview.c_str())) {
                             for (size_t gIdx = 0; gIdx < InputManagerAPI::_API->GetInputCount(2); ++gIdx) {
                                 if (ImGui::Selectable(InputManagerAPI::_API->GetInputName(2, (int)gIdx), gestIdx == (int)gIdx)) {
                                     edit_info.pcModifierKey = (int)gIdx;
@@ -210,40 +276,36 @@ namespace BFCOMenu {
                         }
                     }
                     else if (edit_info.pcModAction != 0) {
-                        if (SearchableCombo("PC Mod Key", &ui_pcModIdx, pcKeyNames, std::size(pcKeyNames))) {
+                        if (SearchableCombo(GetLoc("input.pc_mod_key", "PC Mod Key"), &ui_pcModIdx, pcKeyNames, std::size(pcKeyNames))) {
                             edit_info.pcModifierKey = pcKeyIDs[ui_pcModIdx];
                         }
 
-                        if (edit_info.pcModAction == 1) { // 1 = Tap
+                        if (edit_info.pcModAction == 1) {
                             if (edit_info.pcModTapCount < 1) edit_info.pcModTapCount = 1;
-                            ImGui::SliderInt("PC Mod Tap Amount", &edit_info.pcModTapCount, 1, 5);
+                            ImGui::SliderInt(GetLoc("input.pc_mod_tap", "PC Mod Tap Amount"), &edit_info.pcModTapCount, 1, 5);
                         }
                     }
 
                     // --- GAMEPAD ---
                     ImGui::Separator();
-                    ImGui::TextColored({ 0.4f, 0.8f, 1.0f, 1.0f }, "Gamepad");
-                    if (SearchableCombo("Pad Main Key", &ui_padMainIdx, gamepadKeyNames, std::size(gamepadKeyNames))) {
+                    ImGui::TextColored({ 0.4f, 0.8f, 1.0f, 1.0f }, "%s", GetLoc("input.pad_header", "Gamepad"));
+                    if (SearchableCombo(GetLoc("input.pad_main_key", "Pad Main Key"), &ui_padMainIdx, gamepadKeyNames, std::size(gamepadKeyNames))) {
                         edit_info.gamepadMainKey = gamepadKeyIDs[ui_padMainIdx];
                     }
 
-                    // Pad Main Action com verificação para resetar Mod Action se não for Hold (2)
-                    if (ImGui::Combo("Pad Main Action", &edit_info.gamepadMainAction, actionStateNames, std::size(actionStateNames))) {
+                    if (ImGui::Combo(GetLoc("input.pad_main_action", "Pad Main Action"), &edit_info.gamepadMainAction, actionStateNames, std::size(actionStateNames))) {
                         if (edit_info.gamepadMainAction != 2 && current_padModAct == 3) {
-                            current_padModAct = 0; // Reseta se sair de Hold e o Mod for Gesto
+                            current_padModAct = 0;
                         }
                     }
 
-                    // AJUSTE 2: Pad Main Tap Count
-                    if (edit_info.gamepadMainAction == 1) { // 1 = Tap
+                    if (edit_info.gamepadMainAction == 1) {
                         if (edit_info.gamepadMainTapCount < 1) edit_info.gamepadMainTapCount = 1;
-                        ImGui::SliderInt("Pad Main Tap Amount", &edit_info.gamepadMainTapCount, 1, 5);
+                        ImGui::SliderInt(GetLoc("input.pad_main_tap", "Pad Main Tap Amount"), &edit_info.gamepadMainTapCount, 1, 5);
                     }
 
-                    // AJUSTE 1: Pad Mod Action (Combo customizado para esconder Gesture)
-                    if (ImGui::BeginCombo("Pad Mod Action", actionStateNames[current_padModAct])) {
+                    if (ImGui::BeginCombo(GetLoc("input.pad_mod_action", "Pad Mod Action"), actionStateNames[current_padModAct])) {
                         for (int i = 0; i < std::size(actionStateNames); i++) {
-                            // Pula a opção Gesture (3) se a Main Action não for Hold (2)
                             if (i == 3 && edit_info.gamepadMainAction != 2) continue;
 
                             bool is_selected = (current_padModAct == i);
@@ -269,12 +331,12 @@ namespace BFCOMenu {
                         edit_info.gamepadModAction = current_padModAct;
                     }
 
-                    if (edit_info.gamepadModAction == 3) { // 3 = Gesto
+                    if (edit_info.gamepadModAction == 3) {
                         int gestIdx = edit_info.gamepadModifierKey;
                         std::string gesturePreview = (gestIdx >= 0 && gestIdx < InputManagerAPI::_API->GetInputCount(2))
-                            ? InputManagerAPI::_API->GetInputName(2, gestIdx) : "[ No Gesture ]";
+                            ? InputManagerAPI::_API->GetInputName(2, gestIdx) : GetLoc("input.no_gesture", "[ No Gesture ]");
 
-                        if (ImGui::BeginCombo("Pad Gesture", gesturePreview.c_str())) {
+                        if (ImGui::BeginCombo(GetLoc("input.pad_gesture", "Pad Gesture"), gesturePreview.c_str())) {
                             for (size_t gIdx = 0; gIdx < InputManagerAPI::_API->GetInputCount(2); ++gIdx) {
                                 if (ImGui::Selectable(InputManagerAPI::_API->GetInputName(2, (int)gIdx), gestIdx == (int)gIdx)) {
                                     edit_info.gamepadModifierKey = (int)gIdx;
@@ -284,29 +346,28 @@ namespace BFCOMenu {
                         }
                     }
                     else if (edit_info.gamepadModAction != 0) {
-                        if (SearchableCombo("Pad Mod Key", &ui_padModIdx, gamepadKeyNames, std::size(gamepadKeyNames))) {
+                        if (SearchableCombo(GetLoc("input.pad_mod_key", "Pad Mod Key"), &ui_padModIdx, gamepadKeyNames, std::size(gamepadKeyNames))) {
                             edit_info.gamepadModifierKey = gamepadKeyIDs[ui_padModIdx];
                         }
 
-                        if (edit_info.gamepadModAction == 1) { // 1 = Tap
+                        if (edit_info.gamepadModAction == 1) {
                             if (edit_info.gamepadModTapCount < 1) edit_info.gamepadModTapCount = 1;
-                            ImGui::SliderInt("Pad Mod Tap Amount", &edit_info.gamepadModTapCount, 1, 5);
+                            ImGui::SliderInt(GetLoc("input.pad_mod_tap", "Pad Mod Tap Amount"), &edit_info.gamepadModTapCount, 1, 5);
                         }
                     }
 
                     ImGui::Spacing();
-                    if (ImGui::Button("Update Mapping and Save")) {
+                    if (ImGui::Button(GetLoc("input.update_btn", "Update Mapping and Save"))) {
                         edit_info.name = edit_nameBuf;
-                        // Conforme solicitado: sem mexer com timming (deixando falso para usar o padrao da API)
                         edit_info.useCustomTimings = false;
 
                         bool success = InputManagerAPI::_API->UpdateActionMapping(actionID, edit_info);
                         if (success) {
-                            updateStatusMsg = "Mapping updated successfully.";
+                            updateStatusMsg = GetLoc("input.update_success", "Mapping updated successfully.");
                             updateSuccess = true;
                         }
                         else {
-                            updateStatusMsg = "ERROR! Duplicate name or Combo already registered.";
+                            updateStatusMsg = GetLoc("input.update_error", "ERROR! Duplicate name or Combo already registered.");
                             updateSuccess = false;
                         }
                     }
@@ -327,23 +388,23 @@ namespace BFCOMenu {
         // --- 3. Lógica para Motion (Tipo 1) ---
         else if (inputType == 1) {
             size_t motionCount = InputManagerAPI::_API->GetInputCount(1);
-            std::string previewValue = "[Nenhum Motion Selecionado]";
+            std::string previewValue = GetLoc("input.no_motion", "[Nenhum Motion Selecionado]");
 
             if (motionID >= 0 && motionID < motionCount) {
                 auto info = InputManagerAPI::_API->GetMotionInfo(motionID);
-                previewValue = "[" + std::to_string(motionID) + "] " + (info.name ? std::string(info.name) : "Unnamed");
+                previewValue = "[" + std::to_string(motionID) + "] " + (info.name ? std::string(info.name) : GetLoc("common.unnamed", "Unnamed"));
             }
 
             ImGui::SetNextItemWidth(250);
-            if (ImGui::BeginCombo((std::string("Select Motion##") + label).c_str(), previewValue.c_str())) {
-                if (ImGui::Selectable("[Desativado]", motionID == -1)) {
+            if (ImGui::BeginCombo((std::string(GetLoc("input.select_motion", "Select Motion")) + "##" + label).c_str(), previewValue.c_str())) {
+                if (ImGui::Selectable(GetLoc("common.disabled", "[Desativado]"), motionID == -1)) {
                     if (motionID != -1) InputManagerAPI::_API->UpdateListener(1, motionID, "BFCO", purpose, false);
                     motionID = -1;
                     changed = true;
                 }
                 for (int i = 0; i < motionCount; ++i) {
                     auto info = InputManagerAPI::_API->GetMotionInfo(i);
-                    std::string itemLabel = "[" + std::to_string(i) + "] " + (info.name ? std::string(info.name) : "Unnamed");
+                    std::string itemLabel = "[" + std::to_string(i) + "] " + (info.name ? std::string(info.name) : GetLoc("common.unnamed", "Unnamed"));
                     if (ImGui::Selectable(itemLabel.c_str(), motionID == i)) {
                         if (motionID != -1) InputManagerAPI::_API->UpdateListener(1, motionID, "BFCO", purpose, false);
                         motionID = i;
@@ -364,39 +425,42 @@ namespace BFCOMenu {
     void __stdcall Render() {
         bool settings_changed = false;
 
-        ImGui::Text("Combat settings BFCO");
+        ImGui::Text("%s", GetLoc("menu.title", "Combat settings BFCO"));
         ImGui::Separator(); ImGui::Spacing();
 
-        if (ImGui::Checkbox("Enable combo attack", &Settings::bEnableComboAttack)) settings_changed = true;
+        if (ImGui::Checkbox(GetLoc("menu.enable_combo", "Enable combo attack"), &Settings::bEnableComboAttack)) settings_changed = true;
         if (Settings::bEnableComboAttack) {
-            if (RenderInputSelector("Combo Attack Config", "Combo Attack", Settings::ComboInputType, Settings::ComboActionID, Settings::ComboMotionID)) {
+            if (RenderInputSelector(GetLoc("menu.combo_config", "Combo Attack Config"), "Combo Attack", Settings::ComboInputType, Settings::ComboActionID, Settings::ComboMotionID)) {
                 settings_changed = true;
             }
         }
 
         ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
 
-        if (ImGui::Checkbox("Enable direcional power attack", &Settings::bEnableDirectionalAttack)) settings_changed = true;
-        if (ImGui::Checkbox("Enable power attack key", &Settings::bEnablePowerAttack)) settings_changed = true;
+        if (ImGui::Checkbox(GetLoc("menu.enable_dir_power", "Enable direcional power attack"), &Settings::bEnableDirectionalAttack)) settings_changed = true;
+        if (ImGui::Checkbox(GetLoc("menu.enable_power_key", "Enable power attack key"), &Settings::bEnablePowerAttack)) settings_changed = true;
 
         if (Settings::bEnablePowerAttack) {
-            if (RenderInputSelector("Power Attack Config", "Power Attack", Settings::PowerAttackInputType, Settings::PowerAttackActionID, Settings::PowerAttackMotionID)) {
+            if (RenderInputSelector(GetLoc("menu.power_config", "Power Attack Config"), "Power Attack", Settings::PowerAttackInputType, Settings::PowerAttackActionID, Settings::PowerAttackMotionID)) {
                 settings_changed = true;
             }
         }
 
         ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
 
-        if (ImGui::Checkbox("Instant Block (Cancel attacks to block)", &Settings::bInstantBlock)) settings_changed = true;
+        if (ImGui::Checkbox(GetLoc("menu.instant_block", "Instant Block (Cancel attacks to block)"), &Settings::bInstantBlock)) settings_changed = true;
 
         ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
 
-        ImGui::Text("Animation Type");
+        ImGui::Text("%s", GetLoc("menu.anim_type", "Animation Type"));
 
-        const char* animItems[] = { "BFCO All Attacks", "Vanilla Light Attacks" };
+        const char* animItems[] = {
+            GetLoc("menu.anim_bfco_all", "BFCO All Attacks"),
+            GetLoc("menu.anim_vanilla_light", "Vanilla Light Attacks")
+        };
         const char* animTooltips[] = {
-            "All attacks use BFCO animations",
-            "Player light attacks use vanilla animations"
+            GetLoc("menu.tt_anim_bfco", "All attacks use BFCO animations"),
+            GetLoc("menu.tt_anim_vanilla", "Player light attacks use vanilla animations")
         };
 
         const char* current_animItem = (Settings::AnimationType >= 0 && Settings::AnimationType < 2) ? animItems[Settings::AnimationType] : animItems[0];
@@ -422,12 +486,16 @@ namespace BFCOMenu {
         ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
 
 
-        ImGui::Text("Light Attack Mode");
-        const char* lmbItems[] = { "Vanilla", "Modern", "Modern + AutoNA" };
+        ImGui::Text("%s", GetLoc("menu.light_attack_mode", "Light Attack Mode"));
+        const char* lmbItems[] = {
+            GetLoc("menu.la_vanilla", "Vanilla"),
+            GetLoc("menu.la_modern", "Modern"),
+            GetLoc("menu.la_modern_auto", "Modern + AutoNA")
+        };
         const char* lmbTooltips[] = {
-            "Tap = Light, Hold = Power",
-            "LMB = Light only",
-            "Hold = Auto Light"
+            GetLoc("menu.tt_la_vanilla", "Tap = Light, Hold = Power"),
+            GetLoc("menu.tt_la_modern", "LMB = Light only"),
+            GetLoc("menu.tt_la_modern_auto", "Hold = Auto Light")
         };
         const char* current_lmbItem = (Settings::bPowerAttackLMB >= 0 && Settings::bPowerAttackLMB < 3) ? lmbItems[Settings::bPowerAttackLMB] : lmbItems[0];
 
@@ -449,7 +517,7 @@ namespace BFCOMenu {
         }
 
         ImGui::Spacing(); ImGui::Separator();
-        if (ImGui::Checkbox("Disable jump attack", &Settings::bDisableJumpingAttack)) settings_changed = true;
+        if (ImGui::Checkbox(GetLoc("menu.disable_jump", "Disable jump attack"), &Settings::bDisableJumpingAttack)) settings_changed = true;
 
         if (settings_changed) {
             SaveSettings();
@@ -559,6 +627,7 @@ namespace BFCOMenu {
     void Register() {
         if (SKSEMenuFramework::IsInstalled()) {
             SKSE::log::info("SKSE Menu Framework encontrado. Registrando o menu BFCO.");
+            LoadLanguage();
             LoadSettings();
             SKSEMenuFramework::SetSection("BFCO");
             SKSEMenuFramework::AddSectionItem("Settings", Render);
