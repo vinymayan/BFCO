@@ -24,6 +24,52 @@ namespace BFCOIdles {
 	inline void PlayIdleAnimation(RE::Actor* actor, RE::TESIdleForm* idle);
 }
 
+namespace Settings {
+	inline bool bKeyAttackComb = true;
+	inline int32_t iKeyAttackComb = -1;
+	inline int32_t iKeyAttackPowerNUM = -1;
+
+	inline void Load() {
+		auto dataHandler = RE::TESDataHandler::GetSingleton();
+		if (!dataHandler) {
+			logger::error("Não foi possível acessar o TESDataHandler para carregar as configurações.");
+			return;
+		}
+
+		const std::string_view pluginName = "SCSI-ACTbfco-Main.esp";
+
+
+		auto globalAttackCombBool = dataHandler->LookupForm<RE::TESGlobal>(0x84A, pluginName);
+		auto globalAttackComb = dataHandler->LookupForm<RE::TESGlobal>(0x84B, pluginName);
+		auto globalAttackPower = dataHandler->LookupForm<RE::TESGlobal>(0x84D, pluginName);
+
+
+		if (globalAttackCombBool) {
+			bKeyAttackComb = static_cast<int>(globalAttackCombBool->value) != 0;
+		}
+		else {
+			logger::warn("Global Variable 0x84A (bKeyAttackComb) não encontrada.");
+		}
+
+		if (globalAttackComb) {
+			iKeyAttackComb = static_cast<int32_t>(globalAttackComb->value);
+		}
+		else {
+			logger::warn("Global Variable 0x84B (iKeyAttackComb) não encontrada.");
+		}
+
+		if (globalAttackPower) {
+			iKeyAttackPowerNUM = static_cast<int32_t>(globalAttackPower->value);
+		}
+		else {
+			logger::warn("Global Variable 0x84D (iKeyAttackPowerNUM) não encontrada.");
+		}
+
+		logger::info("MCM Settings Loaded from Globals: bKeyAttackComb={}, iKeyAttackComb={}, iKeyAttackPowerNUM={}",
+			bKeyAttackComb, iKeyAttackComb, iKeyAttackPowerNUM);
+	}
+}
+
 class BFCO
 {
 public:
@@ -59,6 +105,8 @@ public:
 		kStrafeLeft,
 		kForwardLeft
 	};
+
+
 
 	Direction GetDirection(RE::NiPoint2 a_vec, bool a_gamepad);
 	DirectionOcto GetDirectionOcto(RE::NiPoint2 a_vec, bool a_gamepad);
@@ -153,7 +201,7 @@ private:
 };
 
 class AttackStateManager
-	: public RE::BSTEventSink<SKSE::ModCallbackEvent> { 
+	: public RE::BSTEventSink<RE::InputEvent*> {  
 public:
 
 	static AttackStateManager* GetSingleton() {
@@ -162,11 +210,35 @@ public:
 	}
 	void Register();
 
-	RE::BSEventNotifyControl ProcessEvent(const SKSE::ModCallbackEvent* a_event,
-		RE::BSTEventSource<SKSE::ModCallbackEvent>*) override;
+	RE::BSEventNotifyControl ProcessEvent(RE::InputEvent* const* a_event,
+		RE::BSTEventSource<RE::InputEvent*>* a_source) override;
+
 
 private:
 
+
+};
+
+
+class MenuWatcher : public RE::BSTEventSink<RE::MenuOpenCloseEvent>
+{
+public:
+	static MenuWatcher* GetSingleton()
+	{
+		static MenuWatcher singleton;
+		return &singleton;
+	}
+
+	void Register()
+	{
+		auto ui = RE::UI::GetSingleton();
+		if (ui) {
+			ui->AddEventSink(this);
+			SKSE::log::info("MenuWatcher registrado para monitorar o JournalMenu.");
+		}
+	}
+
+	RE::BSEventNotifyControl ProcessEvent(const RE::MenuOpenCloseEvent* a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>*) override;
 };
 
 namespace StaminaManager {

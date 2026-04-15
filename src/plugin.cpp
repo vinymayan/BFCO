@@ -1,24 +1,12 @@
 ﻿#include "logger.h"
 #include "Events.h"
-#include"Settings.h"
+
 void OnMessage(SKSE::MessagingInterface::Message* message) {
-    if (message->type == InputManagerAPI::kMessage_ProvideAPI) {
-        InputManagerAPI::ReceiveAPI(message);
-        logger::info("API do Input Manager recebida com sucesso via SKSE Message!");
-    }
     if (message->type == SKSE::MessagingInterface::kDataLoaded) {
-        InputManagerAPI::RequestAPIDirect();
-
-        if (InputManagerAPI::_API) {
-            logger::info("API do Input Manager conectada via Windows DLL Export!");
-        }
-        else {
-            InputManagerAPI::RequestAPI();
-        }
-
-        AttackStateManager::GetSingleton()->Register();
         BFCO::InstallHooks();
         BFCOIdles::InitIdles();
+        MenuWatcher::GetSingleton()->Register();
+        AttackStateManager::GetSingleton()->Register();
         RE::ScriptEventSourceHolder::GetSingleton()->AddEventSink(BFCO::Hooks::PC3DLoadEventHandler::GetSingleton());
         if (GetModuleHandleA("SCAR.dll")) {
             BFCO::scar = true;
@@ -28,21 +16,17 @@ void OnMessage(SKSE::MessagingInterface::Message* message) {
             BFCO::scar = false;
             logger::info("SCAR.dll not found.");
         }
-        if (GetModuleHandleA("CycleMovesets.dll")) {
-            BFCO::CMF = true;
-            logger::info("CycleMovesets.dll founded");
-        }
-        else {
-            BFCO::CMF = false;
-            logger::info("CycleMovesets.dll not found.");
-        }
-		BFCOMenu::Register();
+
     }
     if (message->type == SKSE::MessagingInterface::kNewGame || message->type == SKSE::MessagingInterface::kPostLoadGame) {
         RE::ScriptEventSourceHolder::GetSingleton()->AddEventSink(BFCO::Hooks::NpcCombatTracker::GetSingleton());
         BFCO::Hooks::NpcCombatTracker::RegisterSinksForExistingCombatants();
         auto player = RE::PlayerCharacter::GetSingleton();
         player->AddAnimationGraphEventSink(BFCO::Hooks::NpcCycleSink::GetSingleton());
+        std::thread([]() {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            Settings::Load();
+            }).detach();
     }
 }
 
