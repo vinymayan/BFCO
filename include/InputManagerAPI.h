@@ -94,7 +94,7 @@ namespace InputManagerAPI {
     // ====================================================================
     inline IInputManager* RequestAPIDirect() {
         // Tenta encontrar a DLL do Input Manager carregada na memória do Skyrim
-        HMODULE handle = GetModuleHandleA("InputManager.dll");
+        HMODULE handle = GetModuleHandleW(L"InputManager.dll");
         if (handle) {
             // Procura a função exportada pelo nome exato
             auto getApiFunc = (void* (*)())GetProcAddress(handle, "GetInputManagerAPI");

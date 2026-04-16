@@ -122,17 +122,23 @@ namespace BFCOMenu {
     }
 
     // Variáveis de Estado Temporário de Edição
-    static int current_edit_action_id = -1;
-    static const char* current_edit_label = nullptr;
-    static InputManagerAPI::ActionInfo edit_info;
-    static char edit_nameBuf[64] = "";
-    static int ui_pcMainIdx = 0, ui_pcModIdx = 0, current_pcModAct = 0;
-    static int ui_padMainIdx = 0, ui_padModIdx = 0, current_padModAct = 0;
-    static std::string updateStatusMsg = "";
-    static bool updateSuccess = false;
+    struct EditState {
+        int current_edit_action_id = -1;
+        InputManagerAPI::ActionInfo edit_info;
+        char edit_nameBuf[64] = "";
+        int ui_pcMainIdx = 0, ui_pcModIdx = 0, current_pcModAct = 0;
+        int ui_padMainIdx = 0, ui_padModIdx = 0, current_padModAct = 0;
+        std::string updateStatusMsg = "";
+        bool updateSuccess = false;
+    };
+
+    static std::map<std::string, EditState> editStates;
 
     bool RenderInputSelector(const char* label, const char* purpose, int& inputType, int& actionID, int& motionID) {
         bool changed = false;
+
+        // Pega ou cria o estado isolado para este seletor específico
+        EditState& state = editStates[label];
 
         ImGui::Text("%s", label);
 
@@ -186,7 +192,7 @@ namespace BFCOMenu {
                         actionID = i;
                         InputManagerAPI::_API->UpdateListener(0, actionID, "BFCO", purpose, true);
                         changed = true;
-                        current_edit_action_id = -1;
+                        state.current_edit_action_id = -1; // Força recarregar os dados na UI
                     }
                 }
                 ImGui::EndCombo();
@@ -196,192 +202,189 @@ namespace BFCOMenu {
             if (actionID != -1) {
                 if (ImGui::TreeNode((std::string(GetLoc("input.edit_keys", "Edit Keys for ")) + label).c_str())) {
 
-                    if (current_edit_action_id != actionID || current_edit_label != label) {
-                        edit_info = InputManagerAPI::_API->GetActionInfo(actionID);
-                        current_edit_action_id = actionID;
-                        current_edit_label = label;
+                    if (state.current_edit_action_id != actionID) {
+                        state.edit_info = InputManagerAPI::_API->GetActionInfo(actionID);
+                        state.current_edit_action_id = actionID;
 
-                        strncpy_s(edit_nameBuf, edit_info.name ? edit_info.name : GetLoc("input.unnamed_action", "Unnamed Action"), sizeof(edit_nameBuf) - 1);
-                        edit_nameBuf[sizeof(edit_nameBuf) - 1] = '\0';
+                        strncpy_s(state.edit_nameBuf, state.edit_info.name ? state.edit_info.name : GetLoc("input.unnamed_action", "Unnamed Action"), sizeof(state.edit_nameBuf) - 1);
+                        state.edit_nameBuf[sizeof(state.edit_nameBuf) - 1] = '\0';
 
-                        ui_pcMainIdx = GetIndexFromID(edit_info.pcMainKey, pcKeyIDs, std::size(pcKeyIDs));
-                        current_pcModAct = edit_info.pcModAction;
-                        ui_pcModIdx = (current_pcModAct == 3) ? 0 : GetIndexFromID(edit_info.pcModifierKey, pcKeyIDs, std::size(pcKeyIDs));
+                        state.ui_pcMainIdx = GetIndexFromID(state.edit_info.pcMainKey, pcKeyIDs, std::size(pcKeyIDs));
+                        state.current_pcModAct = state.edit_info.pcModAction;
+                        state.ui_pcModIdx = (state.current_pcModAct == 3) ? 0 : GetIndexFromID(state.edit_info.pcModifierKey, pcKeyIDs, std::size(pcKeyIDs));
 
-                        ui_padMainIdx = GetIndexFromID(edit_info.gamepadMainKey, gamepadKeyIDs, std::size(gamepadKeyIDs));
-                        current_padModAct = edit_info.gamepadModAction;
-                        ui_padModIdx = (current_padModAct == 3) ? 0 : GetIndexFromID(edit_info.gamepadModifierKey, gamepadKeyIDs, std::size(gamepadKeyIDs));
-                        updateStatusMsg = "";
+                        state.ui_padMainIdx = GetIndexFromID(state.edit_info.gamepadMainKey, gamepadKeyIDs, std::size(gamepadKeyIDs));
+                        state.current_padModAct = state.edit_info.gamepadModAction;
+                        state.ui_padModIdx = (state.current_padModAct == 3) ? 0 : GetIndexFromID(state.edit_info.gamepadModifierKey, gamepadKeyIDs, std::size(gamepadKeyIDs));
+                        state.updateStatusMsg = "";
                     }
 
-                    ImGui::InputText(GetLoc("input.input_name", "Input Name"), edit_nameBuf, sizeof(edit_nameBuf));
+                    ImGui::InputText(GetLoc("input.input_name", "Input Name"), state.edit_nameBuf, sizeof(state.edit_nameBuf));
                     ImGui::Separator();
 
                     // --- PC ---
                     ImGui::TextColored({ 0.4f, 0.8f, 1.0f, 1.0f }, "%s", GetLoc("input.pc_header", "Keyboard and Mouse"));
-                    if (SearchableCombo(GetLoc("input.pc_main_key", "PC Main Key"), &ui_pcMainIdx, pcKeyNames, std::size(pcKeyNames))) {
-                        edit_info.pcMainKey = pcKeyIDs[ui_pcMainIdx];
+                    if (SearchableCombo(GetLoc("input.pc_main_key", "PC Main Key"), &state.ui_pcMainIdx, pcKeyNames, std::size(pcKeyNames))) {
+                        state.edit_info.pcMainKey = pcKeyIDs[state.ui_pcMainIdx];
                     }
 
-                    if (ImGui::Combo(GetLoc("input.pc_main_action", "PC Main Action"), &edit_info.pcMainAction, actionStateNames, std::size(actionStateNames))) {
-                        if (edit_info.pcMainAction != 2 && current_pcModAct == 3) {
-                            current_pcModAct = 0;
+                    if (ImGui::Combo(GetLoc("input.pc_main_action", "PC Main Action"), &state.edit_info.pcMainAction, actionStateNames, 3)) {
+                        if (state.edit_info.pcMainAction != 2 && state.current_pcModAct == 3) {
+                            state.current_pcModAct = 0;
                         }
                     }
 
-                    if (edit_info.pcMainAction == 1) {
-                        if (edit_info.pcMainTapCount < 1) edit_info.pcMainTapCount = 1;
-                        ImGui::SliderInt(GetLoc("input.pc_main_tap", "PC Main Tap Amount"), &edit_info.pcMainTapCount, 1, 5);
+                    if (state.edit_info.pcMainAction == 1) {
+                        if (state.edit_info.pcMainTapCount < 1) state.edit_info.pcMainTapCount = 1;
+                        ImGui::SliderInt(GetLoc("input.pc_main_tap", "PC Main Tap Amount"), &state.edit_info.pcMainTapCount, 1, 5);
                     }
 
-                    if (ImGui::BeginCombo(GetLoc("input.pc_mod_action", "PC Mod Action"), actionStateNames[current_pcModAct])) {
+                    if (ImGui::BeginCombo(GetLoc("input.pc_mod_action", "PC Mod Action"), actionStateNames[state.current_pcModAct])) {
                         for (int i = 0; i < std::size(actionStateNames); i++) {
-                            if (i == 3 && edit_info.pcMainAction != 2) continue;
+                            if (i == 3 && state.edit_info.pcMainAction != 2) continue;
 
-                            bool is_selected = (current_pcModAct == i);
+                            bool is_selected = (state.current_pcModAct == i);
                             if (ImGui::Selectable(actionStateNames[i], is_selected)) {
-                                current_pcModAct = i;
+                                state.current_pcModAct = i;
                             }
                             if (is_selected) ImGui::SetItemDefaultFocus();
                         }
                         ImGui::EndCombo();
                     }
 
-                    if (current_pcModAct != edit_info.pcModAction) {
-                        if (current_pcModAct == 3) {
-                            edit_info.pcModifierKey = 0;
+                    if (state.current_pcModAct != state.edit_info.pcModAction) {
+                        if (state.current_pcModAct == 3) {
+                            state.edit_info.pcModifierKey = 0;
                         }
-                        else if (current_pcModAct != 0) {
-                            ui_pcModIdx = 0;
-                            edit_info.pcModifierKey = pcKeyIDs[ui_pcModIdx];
+                        else if (state.current_pcModAct != 0) {
+                            state.ui_pcModIdx = 0;
+                            state.edit_info.pcModifierKey = pcKeyIDs[state.ui_pcModIdx];
                         }
                         else {
-                            edit_info.pcModifierKey = 0;
+                            state.edit_info.pcModifierKey = 0;
                         }
-                        edit_info.pcModAction = current_pcModAct;
+                        state.edit_info.pcModAction = state.current_pcModAct;
                     }
 
-                    if (edit_info.pcModAction == 3) {
-                        int gestIdx = edit_info.pcModifierKey;
+                    if (state.edit_info.pcModAction == 3) {
+                        int gestIdx = state.edit_info.pcModifierKey;
                         std::string gesturePreview = (gestIdx >= 0 && gestIdx < InputManagerAPI::_API->GetInputCount(2))
                             ? InputManagerAPI::_API->GetInputName(2, gestIdx) : GetLoc("input.no_gesture", "[ No Gesture ]");
 
                         if (ImGui::BeginCombo(GetLoc("input.pc_gesture", "PC Gesture"), gesturePreview.c_str())) {
                             for (size_t gIdx = 0; gIdx < InputManagerAPI::_API->GetInputCount(2); ++gIdx) {
                                 if (ImGui::Selectable(InputManagerAPI::_API->GetInputName(2, (int)gIdx), gestIdx == (int)gIdx)) {
-                                    edit_info.pcModifierKey = (int)gIdx;
+                                    state.edit_info.pcModifierKey = (int)gIdx;
                                 }
                             }
                             ImGui::EndCombo();
                         }
                     }
-                    else if (edit_info.pcModAction != 0) {
-                        if (SearchableCombo(GetLoc("input.pc_mod_key", "PC Mod Key"), &ui_pcModIdx, pcKeyNames, std::size(pcKeyNames))) {
-                            edit_info.pcModifierKey = pcKeyIDs[ui_pcModIdx];
+                    else if (state.edit_info.pcModAction != 0) {
+                        if (SearchableCombo(GetLoc("input.pc_mod_key", "PC Mod Key"), &state.ui_pcModIdx, pcKeyNames, std::size(pcKeyNames))) {
+                            state.edit_info.pcModifierKey = pcKeyIDs[state.ui_pcModIdx];
                         }
 
-                        if (edit_info.pcModAction == 1) {
-                            if (edit_info.pcModTapCount < 1) edit_info.pcModTapCount = 1;
-                            ImGui::SliderInt(GetLoc("input.pc_mod_tap", "PC Mod Tap Amount"), &edit_info.pcModTapCount, 1, 5);
+                        if (state.edit_info.pcModAction == 1) {
+                            if (state.edit_info.pcModTapCount < 1) state.edit_info.pcModTapCount = 1;
+                            ImGui::SliderInt(GetLoc("input.pc_mod_tap", "PC Mod Tap Amount"), &state.edit_info.pcModTapCount, 1, 5);
                         }
                     }
 
                     // --- GAMEPAD ---
                     ImGui::Separator();
                     ImGui::TextColored({ 0.4f, 0.8f, 1.0f, 1.0f }, "%s", GetLoc("input.pad_header", "Gamepad"));
-                    if (SearchableCombo(GetLoc("input.pad_main_key", "Pad Main Key"), &ui_padMainIdx, gamepadKeyNames, std::size(gamepadKeyNames))) {
-                        edit_info.gamepadMainKey = gamepadKeyIDs[ui_padMainIdx];
+                    if (SearchableCombo(GetLoc("input.pad_main_key", "Pad Main Key"), &state.ui_padMainIdx, gamepadKeyNames, std::size(gamepadKeyNames))) {
+                        state.edit_info.gamepadMainKey = gamepadKeyIDs[state.ui_padMainIdx];
                     }
 
-                    if (ImGui::Combo(GetLoc("input.pad_main_action", "Pad Main Action"), &edit_info.gamepadMainAction, actionStateNames, std::size(actionStateNames))) {
-                        if (edit_info.gamepadMainAction != 2 && current_padModAct == 3) {
-                            current_padModAct = 0;
+                    if (ImGui::Combo(GetLoc("input.pad_main_action", "Pad Main Action"), &state.edit_info.gamepadMainAction, actionStateNames, 3)) {
+                        if (state.edit_info.gamepadMainAction != 2 && state.current_padModAct == 3) {
+                            state.current_padModAct = 0;
                         }
                     }
 
-                    if (edit_info.gamepadMainAction == 1) {
-                        if (edit_info.gamepadMainTapCount < 1) edit_info.gamepadMainTapCount = 1;
-                        ImGui::SliderInt(GetLoc("input.pad_main_tap", "Pad Main Tap Amount"), &edit_info.gamepadMainTapCount, 1, 5);
+                    if (state.edit_info.gamepadMainAction == 1) {
+                        if (state.edit_info.gamepadMainTapCount < 1) state.edit_info.gamepadMainTapCount = 1;
+                        ImGui::SliderInt(GetLoc("input.pad_main_tap", "Pad Main Tap Amount"), &state.edit_info.gamepadMainTapCount, 1, 5);
                     }
 
-                    if (ImGui::BeginCombo(GetLoc("input.pad_mod_action", "Pad Mod Action"), actionStateNames[current_padModAct])) {
+                    if (ImGui::BeginCombo(GetLoc("input.pad_mod_action", "Pad Mod Action"), actionStateNames[state.current_padModAct])) {
                         for (int i = 0; i < std::size(actionStateNames); i++) {
-                            if (i == 3 && edit_info.gamepadMainAction != 2) continue;
+                            if (i == 3 && state.edit_info.gamepadMainAction != 2) continue;
 
-                            bool is_selected = (current_padModAct == i);
+                            bool is_selected = (state.current_padModAct == i);
                             if (ImGui::Selectable(actionStateNames[i], is_selected)) {
-                                current_padModAct = i;
+                                state.current_padModAct = i;
                             }
                             if (is_selected) ImGui::SetItemDefaultFocus();
                         }
                         ImGui::EndCombo();
                     }
 
-                    if (current_padModAct != edit_info.gamepadModAction) {
-                        if (current_padModAct == 3) {
-                            edit_info.gamepadModifierKey = 0;
+                    if (state.current_padModAct != state.edit_info.gamepadModAction) {
+                        if (state.current_padModAct == 3) {
+                            state.edit_info.gamepadModifierKey = 0;
                         }
-                        else if (current_padModAct != 0) {
-                            ui_padModIdx = 0;
-                            edit_info.gamepadModifierKey = gamepadKeyIDs[ui_padModIdx];
+                        else if (state.current_padModAct != 0) {
+                            state.ui_padModIdx = 0;
+                            state.edit_info.gamepadModifierKey = gamepadKeyIDs[state.ui_padModIdx];
                         }
                         else {
-                            edit_info.gamepadModifierKey = 0;
+                            state.edit_info.gamepadModifierKey = 0;
                         }
-                        edit_info.gamepadModAction = current_padModAct;
+                        state.edit_info.gamepadModAction = state.current_padModAct;
                     }
 
-                    if (edit_info.gamepadModAction == 3) {
-                        int gestIdx = edit_info.gamepadModifierKey;
+                    if (state.edit_info.gamepadModAction == 3) {
+                        int gestIdx = state.edit_info.gamepadModifierKey;
                         std::string gesturePreview = (gestIdx >= 0 && gestIdx < InputManagerAPI::_API->GetInputCount(2))
                             ? InputManagerAPI::_API->GetInputName(2, gestIdx) : GetLoc("input.no_gesture", "[ No Gesture ]");
 
                         if (ImGui::BeginCombo(GetLoc("input.pad_gesture", "Pad Gesture"), gesturePreview.c_str())) {
                             for (size_t gIdx = 0; gIdx < InputManagerAPI::_API->GetInputCount(2); ++gIdx) {
                                 if (ImGui::Selectable(InputManagerAPI::_API->GetInputName(2, (int)gIdx), gestIdx == (int)gIdx)) {
-                                    edit_info.gamepadModifierKey = (int)gIdx;
+                                    state.edit_info.gamepadModifierKey = (int)gIdx;
                                 }
                             }
                             ImGui::EndCombo();
                         }
                     }
-                    else if (edit_info.gamepadModAction != 0) {
-                        if (SearchableCombo(GetLoc("input.pad_mod_key", "Pad Mod Key"), &ui_padModIdx, gamepadKeyNames, std::size(gamepadKeyNames))) {
-                            edit_info.gamepadModifierKey = gamepadKeyIDs[ui_padModIdx];
+                    else if (state.edit_info.gamepadModAction != 0) {
+                        if (SearchableCombo(GetLoc("input.pad_mod_key", "Pad Mod Key"), &state.ui_padModIdx, gamepadKeyNames, std::size(gamepadKeyNames))) {
+                            state.edit_info.gamepadModifierKey = gamepadKeyIDs[state.ui_padModIdx];
                         }
 
-                        if (edit_info.gamepadModAction == 1) {
-                            if (edit_info.gamepadModTapCount < 1) edit_info.gamepadModTapCount = 1;
-                            ImGui::SliderInt(GetLoc("input.pad_mod_tap", "Pad Mod Tap Amount"), &edit_info.gamepadModTapCount, 1, 5);
+                        if (state.edit_info.gamepadModAction == 1) {
+                            if (state.edit_info.gamepadModTapCount < 1) state.edit_info.gamepadModTapCount = 1;
+                            ImGui::SliderInt(GetLoc("input.pad_mod_tap", "Pad Mod Tap Amount"), &state.edit_info.gamepadModTapCount, 1, 5);
                         }
                     }
 
                     ImGui::Spacing();
                     if (ImGui::Button(GetLoc("input.update_btn", "Update Mapping and Save"))) {
-                        edit_info.name = edit_nameBuf;
-                        edit_info.useCustomTimings = false;
+                        state.edit_info.name = state.edit_nameBuf;
+                        state.edit_info.useCustomTimings = false;
 
-                        bool success = InputManagerAPI::_API->UpdateActionMapping(actionID, edit_info);
+                        bool success = InputManagerAPI::_API->UpdateActionMapping(actionID, state.edit_info);
                         if (success) {
-                            updateStatusMsg = GetLoc("input.update_success", "Mapping updated successfully.");
-                            updateSuccess = true;
+                            state.updateStatusMsg = GetLoc("input.update_success", "Mapping updated successfully.");
+                            state.updateSuccess = true;
                         }
                         else {
-                            updateStatusMsg = GetLoc("input.update_error", "ERROR! Duplicate name or Combo already registered.");
-                            updateSuccess = false;
+                            state.updateStatusMsg = GetLoc("input.update_error", "ERROR! Duplicate name or Combo already registered.");
+                            state.updateSuccess = false;
                         }
                     }
 
-                    if (!updateStatusMsg.empty()) {
-                        ImGui::TextColored(updateSuccess ? ImGui::ImVec4(0.2f, 1.0f, 0.2f, 1.0f) : ImGui::ImVec4(1.0f, 0.2f, 0.2f, 1.0f), "%s", updateStatusMsg.c_str());
+                    if (!state.updateStatusMsg.empty()) {
+                        ImGui::TextColored(state.updateSuccess ? ImGui::ImVec4(0.2f, 1.0f, 0.2f, 1.0f) : ImGui::ImVec4(1.0f, 0.2f, 0.2f, 1.0f), "%s", state.updateStatusMsg.c_str());
                     }
                     ImGui::TreePop();
                 }
                 else {
-                    if (current_edit_label == label) {
-                        current_edit_action_id = -1;
-                        current_edit_label = nullptr;
-                    }
+                    // Reseta o status de edição quando a sub-árvore do menu fecha
+                    state.current_edit_action_id = -1;
                 }
             }
         }
@@ -620,6 +623,19 @@ namespace BFCOMenu {
             }
             else {
                 SKSE::log::warn("Nao foi possivel encontrar a GlobalVariable: {}", editorID);
+            }
+        }
+
+        auto iniCollection = RE::INISettingCollection::GetSingleton();
+        if (iniCollection) {
+            RE::Setting* setting = iniCollection->GetSetting("fSubsequentPowerAttackDelay:Controls");
+            if (setting) {
+                float delayValue = (Settings::bPowerAttackLMB == 2) ? 0.3f : 2.0f;
+                setting->data.f = delayValue;
+                SKSE::log::info("INI 'fSubsequentPowerAttackDelay:Controls' alterado para: {}", delayValue);
+            }
+            else {
+                SKSE::log::warn("Aviso: Configuração INI 'fSubsequentPowerAttackDelay:Controls' nao encontrada.");
             }
         }
     }
