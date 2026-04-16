@@ -159,8 +159,6 @@ inline RE::NiPoint3 GetPosition(const RE::TESObjectREFR* obj) {
 	return newPosition;
 }
 
-
-
 namespace BFCOCombatState {
 	inline std::unordered_map<RE::FormID, bool> LastWasPower;
 	inline std::shared_mutex StateMutex;
@@ -186,7 +184,6 @@ namespace BFCOCombatState {
 }
 
 namespace BFCOIdles {
-
 
 	inline RE::TESIdleForm* GetIdleByFormID(RE::FormID formID, const std::string& pluginName) {
 		if (auto dataHandler = RE::TESDataHandler::GetSingleton()) {
@@ -517,7 +514,6 @@ void BFCO::Hooks::NpcCombatTracker::RegisterSinksForExistingCombatants()
 	SKSE::log::info("[NpcCombatTracker] Verificação concluída.");
 }
 
-
 inline std::array blockedMenus = {
 	RE::DialogueMenu::MENU_NAME,    RE::JournalMenu::MENU_NAME,    RE::MapMenu::MENU_NAME,
 	RE::StatsMenu::MENU_NAME,       RE::ContainerMenu::MENU_NAME,  RE::InventoryMenu::MENU_NAME,
@@ -549,6 +545,38 @@ void AttackStateManager::Register() {
 		SKSE::log::error(
 			"FALHA: O gerenciador de input (BSInputDeviceManager) é nulo. O listener não pôde ser registrado.");
 	}
+}
+
+std::set<uint32_t> pressedKeys_K; // Teclado
+std::set<uint32_t> pressedKeys_M; // Mouse
+std::set<uint32_t> pressedKeys_G; // Gamepad
+
+bool IsKeyPressed(uint32_t key) {
+	if (key >= 256) {
+		return pressedKeys_M.count(key) > 0;
+	}
+	return pressedKeys_K.count(key) > 0;
+}
+
+
+bool CheckKeyCombination(uint32_t eventKeyCode, RE::INPUT_DEVICE device,
+	uint32_t settingKey, uint32_t settingMod) {
+
+	// Se a tecla principal for -1 ou 0 (não mapeada/ignorada), retorna falso
+	if (settingKey == -1 || settingKey == 0) return false;
+
+	// Se o modificador for -1 ou 0, trata como se não exigisse modificador
+	if (settingMod == -1 || settingMod == 0) {
+		return eventKeyCode == settingKey;
+	}
+
+	if (eventKeyCode == settingKey) {
+		return IsKeyPressed(settingMod);
+	}
+	if (eventKeyCode == settingMod) {
+		return IsKeyPressed(settingKey);
+	}
+	return false;
 }
 
 RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const* a_event,
@@ -593,12 +621,35 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
 		if (device == RE::INPUT_DEVICE::kMouse) {
 			keyCode += 256;
 		}
-		else if (device == RE::INPUT_DEVICE::kGamepad) {
 
+		if (buttonEvent->IsDown()) {
+			if (device == RE::INPUT_DEVICE::kKeyboard) pressedKeys_K.insert(keyCode);
+			else if (device == RE::INPUT_DEVICE::kMouse) pressedKeys_M.insert(keyCode);
+			else if (device == RE::INPUT_DEVICE::kGamepad) pressedKeys_G.insert(keyCode);
+		}
+		else if (buttonEvent->IsUp()) {
+			if (device == RE::INPUT_DEVICE::kKeyboard) pressedKeys_K.erase(keyCode);
+			else if (device == RE::INPUT_DEVICE::kMouse) pressedKeys_M.erase(keyCode);
+			else if (device == RE::INPUT_DEVICE::kGamepad) pressedKeys_G.erase(keyCode);
+		}
+		bool isPowerAttackKeyPressed = false;
+		bool comboKeyPressed = false;
+
+		if (CheckKeyCombination(keyCode, device, Settings::iKeyAttackPowerNUM, Settings::iKeyAttackPowerNUMMod))
+			isPowerAttackKeyPressed = true;
+		if (!isPowerAttackKeyPressed && device == RE::INPUT_DEVICE::kGamepad) {
+			if (CheckKeyCombination(keyCode, device, Settings::iKeyAttackPowerNUM, Settings::iKeyAttackPowerNUMMod))
+				isPowerAttackKeyPressed = true;
 		}
 
-		bool isPowerAttackKeyPressed = (Settings::iKeyAttackPowerNUM != -1 && keyCode == Settings::iKeyAttackPowerNUM);
-		bool comboKeyPressed = (Settings::bKeyAttackComb && Settings::iKeyAttackComb != -1 && keyCode == Settings::iKeyAttackComb);
+		if (Settings::bKeyAttackComb) {
+			if (CheckKeyCombination(keyCode, device, Settings::iKeyAttackComb, Settings::iKeyAttackCombMod))
+				comboKeyPressed = true;
+			if (!comboKeyPressed && device == RE::INPUT_DEVICE::kGamepad) {
+				if (CheckKeyCombination(keyCode, device, Settings::iKeyAttackComb, Settings::iKeyAttackCombMod))
+					comboKeyPressed = true;
+			}
+		}
 
 		if (buttonEvent->IsDown()) {
 			if (isPowerAttackKeyPressed) {

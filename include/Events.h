@@ -28,6 +28,8 @@ namespace Settings {
 	inline bool bKeyAttackComb = true;
 	inline int32_t iKeyAttackComb = -1;
 	inline int32_t iKeyAttackPowerNUM = -1;
+	inline int32_t iKeyAttackCombMod = -1;
+	inline int32_t iKeyAttackPowerNUMMod = -1;
 
 	inline void Load() {
 		auto dataHandler = RE::TESDataHandler::GetSingleton();
@@ -38,10 +40,11 @@ namespace Settings {
 
 		const std::string_view pluginName = "SCSI-ACTbfco-Main.esp";
 
-
 		auto globalAttackCombBool = dataHandler->LookupForm<RE::TESGlobal>(0x84A, pluginName);
 		auto globalAttackComb = dataHandler->LookupForm<RE::TESGlobal>(0x84B, pluginName);
 		auto globalAttackPower = dataHandler->LookupForm<RE::TESGlobal>(0x84D, pluginName);
+		auto globalAttackCombMod = dataHandler->LookupForm<RE::TESGlobal>(0x959, pluginName);
+		auto globalAttackPowerMod = dataHandler->LookupForm<RE::TESGlobal>(0x95A, pluginName);
 
 
 		if (globalAttackCombBool) {
@@ -64,9 +67,27 @@ namespace Settings {
 		else {
 			logger::warn("Global Variable 0x84D (iKeyAttackPowerNUM) não encontrada.");
 		}
+		if (globalAttackPower) {
+			iKeyAttackPowerNUM = static_cast<int32_t>(globalAttackPower->value);
+		}
+		else {
+			logger::warn("Global Variable 0x84D (iKeyAttackPowerNUM) não encontrada.");
+		}
+		if (globalAttackCombMod) {
+			iKeyAttackCombMod = static_cast<int32_t>(globalAttackCombMod->value);
+		}
+		else {
+			logger::warn("Global Variable 0x959 (iKeyAttackCombMod) não encontrada.");
+		}
+		if (globalAttackPowerMod) {
+			iKeyAttackPowerNUMMod = static_cast<int32_t>(globalAttackPowerMod->value);
+		}
+		else {
+			logger::warn("Global Variable 0x95A (iKeyAttackPowerNUMMod) não encontrada.");
+		}
 
-		logger::info("MCM Settings Loaded from Globals: bKeyAttackComb={}, iKeyAttackComb={}, iKeyAttackPowerNUM={}",
-			bKeyAttackComb, iKeyAttackComb, iKeyAttackPowerNUM);
+		logger::info("Configurações carregadas: bKeyAttackComb={}, iKeyAttackComb={}, iKeyAttackPowerNUM={}, iKeyAttackCombMod={}, iKeyAttackPowerNUMMod={}",
+			bKeyAttackComb, iKeyAttackComb, iKeyAttackPowerNUM, iKeyAttackCombMod, iKeyAttackPowerNUMMod);
 	}
 }
 
