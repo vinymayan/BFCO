@@ -551,11 +551,16 @@ std::set<uint32_t> pressedKeys_K; // Teclado
 std::set<uint32_t> pressedKeys_M; // Mouse
 std::set<uint32_t> pressedKeys_G; // Gamepad
 
-bool IsKeyPressed(uint32_t key) {
-	if (key >= 256) {
+bool IsKeyPressed(uint32_t key, RE::INPUT_DEVICE device) {
+	if (device == RE::INPUT_DEVICE::kGamepad) {
+		return pressedKeys_G.count(key) > 0;
+	}
+	else if (device == RE::INPUT_DEVICE::kMouse) {
 		return pressedKeys_M.count(key) > 0;
 	}
-	return pressedKeys_K.count(key) > 0;
+	else {
+		return pressedKeys_K.count(key) > 0;
+	}
 }
 
 
@@ -571,10 +576,10 @@ bool CheckKeyCombination(uint32_t eventKeyCode, RE::INPUT_DEVICE device,
 	}
 
 	if (eventKeyCode == settingKey) {
-		return IsKeyPressed(settingMod);
+		return IsKeyPressed(settingMod, device);
 	}
 	if (eventKeyCode == settingMod) {
-		return IsKeyPressed(settingKey);
+		return IsKeyPressed(settingKey, device);
 	}
 	return false;
 }
