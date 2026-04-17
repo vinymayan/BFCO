@@ -228,8 +228,9 @@ namespace BFCOMenu {
                         state.edit_info.pcMainKey = pcKeyIDs[state.ui_pcMainIdx];
                     }
 
-                    if (ImGui::Combo(GetLoc("input.pc_main_action", "PC Main Action"), &state.edit_info.pcMainAction, actionStateNames, 3)) {
-                        if (state.edit_info.pcMainAction != 2 && state.current_pcModAct == 3) {
+                    if (ImGui::Combo(GetLoc("input.pc_main_action", "PC Main Action"), &state.edit_info.pcMainAction, actionStateNames, std::size(actionStateNames))) {
+                        if (state.edit_info.pcMainAction == 3) state.edit_info.pcMainAction = 0;
+                        if (state.edit_info.pcMainAction != 2 && state.edit_info.pcMainAction != 4 && state.current_pcModAct == 3) {
                             state.current_pcModAct = 0;
                         }
                     }
@@ -241,7 +242,7 @@ namespace BFCOMenu {
 
                     if (ImGui::BeginCombo(GetLoc("input.pc_mod_action", "PC Mod Action"), actionStateNames[state.current_pcModAct])) {
                         for (int i = 0; i < std::size(actionStateNames); i++) {
-                            if (i == 3 && state.edit_info.pcMainAction != 2) continue;
+                            if (i == 3 && (state.edit_info.pcMainAction != 2 && state.edit_info.pcMainAction != 4)) continue;
 
                             bool is_selected = (state.current_pcModAct == i);
                             if (ImGui::Selectable(actionStateNames[i], is_selected)) {
@@ -298,8 +299,10 @@ namespace BFCOMenu {
                         state.edit_info.gamepadMainKey = gamepadKeyIDs[state.ui_padMainIdx];
                     }
 
-                    if (ImGui::Combo(GetLoc("input.pad_main_action", "Pad Main Action"), &state.edit_info.gamepadMainAction, actionStateNames, 3)) {
-                        if (state.edit_info.gamepadMainAction != 2 && state.current_padModAct == 3) {
+                    if (ImGui::Combo(GetLoc("input.pad_main_action", "Pad Main Action"), &state.edit_info.gamepadMainAction, actionStateNames, std::size(actionStateNames))) {
+                        if (state.edit_info.gamepadMainAction == 3) state.edit_info.gamepadMainAction = 0;
+
+                        if (state.edit_info.gamepadMainAction != 2 && state.edit_info.gamepadMainAction != 4 && state.current_padModAct == 3) {
                             state.current_padModAct = 0;
                         }
                     }
@@ -311,7 +314,7 @@ namespace BFCOMenu {
 
                     if (ImGui::BeginCombo(GetLoc("input.pad_mod_action", "Pad Mod Action"), actionStateNames[state.current_padModAct])) {
                         for (int i = 0; i < std::size(actionStateNames); i++) {
-                            if (i == 3 && state.edit_info.gamepadMainAction != 2) continue;
+                            if (i == 3 && (state.edit_info.gamepadMainAction != 2 && state.edit_info.gamepadMainAction != 4)) continue;
 
                             bool is_selected = (state.current_padModAct == i);
                             if (ImGui::Selectable(actionStateNames[i], is_selected)) {
