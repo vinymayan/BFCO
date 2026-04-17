@@ -4,7 +4,7 @@
 #include "SKSEMCP/SKSEMenuFramework.hpp"
 #include "InputManagerAPI.h"
 
-inline const char* actionStateNames[] = { "Ignore", "Tap", "Hold", "Gesture" };
+inline const char* actionStateNames[] = { "Ignore", "Tap", "Hold", "Gesture", "Press" };
 
 constexpr uint32_t MOUSE_OFFSET = 256;
 constexpr uint32_t GAMEPAD_OFFSET = 266;

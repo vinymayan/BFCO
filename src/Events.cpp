@@ -656,6 +656,12 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(const SKSE::ModCallbac
 					playDirectionalPowerAttack(player);
 				}
 			}
+			
+		}
+	}
+	else if (eventName == "InputManager_ActionReleased") {
+		if (Settings::PowerAttackInputType == 0 && inputID == Settings::PowerAttackActionID) {
+			player->NotifyAnimationGraph("BFCOAttackstart_1");
 		}
 	}
 	// ===========================================================
@@ -748,6 +754,7 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(const SKSE::ModCallbac
 					playDirectionalPowerAttack(player);
 				}
 			}
+			player->NotifyAnimationGraph("BFCOAttackstart_1");
 		}
 	}
 
