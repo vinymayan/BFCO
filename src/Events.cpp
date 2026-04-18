@@ -551,16 +551,10 @@ std::set<uint32_t> pressedKeys_K; // Teclado
 std::set<uint32_t> pressedKeys_M; // Mouse
 std::set<uint32_t> pressedKeys_G; // Gamepad
 
-bool IsKeyPressed(uint32_t key, RE::INPUT_DEVICE device) {
-	if (device == RE::INPUT_DEVICE::kGamepad) {
-		return pressedKeys_G.count(key) > 0;
-	}
-	else if (device == RE::INPUT_DEVICE::kMouse) {
-		return pressedKeys_M.count(key) > 0;
-	}
-	else {
-		return pressedKeys_K.count(key) > 0;
-	}
+bool IsKeyPressed(uint32_t key) {
+	return pressedKeys_K.count(key) > 0 ||
+		pressedKeys_M.count(key) > 0 ||
+		pressedKeys_G.count(key) > 0;
 }
 
 
@@ -576,10 +570,10 @@ bool CheckKeyCombination(uint32_t eventKeyCode, RE::INPUT_DEVICE device,
 	}
 
 	if (eventKeyCode == settingKey) {
-		return IsKeyPressed(settingMod, device);
+		return IsKeyPressed(settingMod);
 	}
 	if (eventKeyCode == settingMod) {
-		return IsKeyPressed(settingKey, device);
+		return IsKeyPressed(settingKey);
 	}
 	return false;
 }
@@ -613,7 +607,9 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
 		auto rawKeyCode = buttonEvent->GetIDCode();
 		auto keyCode = rawKeyCode;
 		const auto playerState = player->AsActorState();
-
+		if(device == RE::INPUT_DEVICE::kGamepad) {
+			logger::info("Keycode: {}, Device: Gamepad", keyCode);
+		}
 
 		if (!(!player->IsInKillMove() && playerState->GetWeaponState() == RE::WEAPON_STATE::kDrawn &&
 			playerState->GetSitSleepState() == RE::SIT_SLEEP_STATE::kNormal &&
@@ -642,6 +638,8 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
 
 		if (CheckKeyCombination(keyCode, device, Settings::iKeyAttackPowerNUM, Settings::iKeyAttackPowerNUMMod))
 			isPowerAttackKeyPressed = true;
+		if (!isPowerAttackKeyPressed && CheckKeyCombination(keyCode, device, Settings::iKeyAttackPowerNUM, Settings::iKeyAttackPowerNUMMod))
+			isPowerAttackKeyPressed = true;
 		if (!isPowerAttackKeyPressed && device == RE::INPUT_DEVICE::kGamepad) {
 			if (CheckKeyCombination(keyCode, device, Settings::iKeyAttackPowerNUM, Settings::iKeyAttackPowerNUMMod))
 				isPowerAttackKeyPressed = true;
@@ -649,6 +647,8 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
 
 		if (Settings::bKeyAttackComb) {
 			if (CheckKeyCombination(keyCode, device, Settings::iKeyAttackComb, Settings::iKeyAttackCombMod))
+				comboKeyPressed = true;
+			if (!comboKeyPressed && CheckKeyCombination(keyCode, device, Settings::iKeyAttackComb, Settings::iKeyAttackCombMod))
 				comboKeyPressed = true;
 			if (!comboKeyPressed && device == RE::INPUT_DEVICE::kGamepad) {
 				if (CheckKeyCombination(keyCode, device, Settings::iKeyAttackComb, Settings::iKeyAttackCombMod))
