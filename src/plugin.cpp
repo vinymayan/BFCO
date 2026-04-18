@@ -40,19 +40,19 @@ void OnMessage(SKSE::MessagingInterface::Message* message) {
         if (InputManagerAPI::_API) {
             if (Settings::bEnableComboAttack) {
                 if (Settings::ComboInputType == 0 && Settings::ComboActionID != -1) {
-                    InputManagerAPI::_API->UpdateListener(0, Settings::ComboActionID, "BFCO", "Combo Attack", true);
+                    InputManagerAPI::_API->UpdateListener(0, Settings::ComboActionID, "BFCO", "Combo Attack", true, nullptr, 0, nullptr, 0);
                 }
                 else if (Settings::ComboInputType == 1 && Settings::ComboMotionID != -1) {
-                    InputManagerAPI::_API->UpdateListener(1, Settings::ComboMotionID, "BFCO", "Combo Attack", true);
+                    InputManagerAPI::_API->UpdateListener(1, Settings::ComboMotionID, "BFCO", "Combo Attack", true, nullptr, 0, nullptr, 0);
                 }
             }
 
             if (Settings::bEnablePowerAttack) {
                 if (Settings::PowerAttackInputType == 0 && Settings::PowerAttackActionID != -1) {
-                    InputManagerAPI::_API->UpdateListener(0, Settings::PowerAttackActionID, "BFCO", "Power Attack", true);
+                    InputManagerAPI::_API->UpdateListener(0, Settings::PowerAttackActionID, "BFCO", "Power Attack", true, nullptr, 0, nullptr, 0);
                 }
                 else if (Settings::PowerAttackInputType == 1 && Settings::PowerAttackMotionID != -1) {
-                    InputManagerAPI::_API->UpdateListener(1, Settings::PowerAttackMotionID, "BFCO", "Power Attack", true);
+                    InputManagerAPI::_API->UpdateListener(1, Settings::PowerAttackMotionID, "BFCO", "Power Attack", true, nullptr, 0, nullptr, 0);
                 }
             }
         }

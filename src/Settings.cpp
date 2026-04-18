@@ -445,7 +445,11 @@ namespace BFCOMenu {
 
         if (ImGui::Checkbox(GetLoc("menu.enable_dir_power", "Enable direcional power attack"), &Settings::bEnableDirectionalAttack)) settings_changed = true;
         if (ImGui::Checkbox(GetLoc("menu.enable_power_key", "Enable power attack key"), &Settings::bEnablePowerAttack)) settings_changed = true;
-
+        ImGui::SameLine();
+        ImGui::TextDisabled("(?)");
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s", GetLoc("menu.tt_power_recommend", "Recommendation: If you want to use the DIY Custom Power Attack, set the Main Key action state to 'Hold' or 'Press'."));
+        }
         if (Settings::bEnablePowerAttack) {
             if (RenderInputSelector(GetLoc("menu.power_config", "Power Attack Config"), "Power Attack", Settings::PowerAttackInputType, Settings::PowerAttackActionID, Settings::PowerAttackMotionID)) {
                 settings_changed = true;
