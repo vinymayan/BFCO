@@ -2,7 +2,7 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 #include <shared_mutex>
-
+#include "DelayedDispatcher.h"
 
 // https://blackdoor.github.io/blog/thumbstick-controls/
 
@@ -821,22 +821,18 @@ void BFCO::Hooks::ScheduleSinkRegistration(RE::Actor* actor, int attempts)
 		return;
 	}
 
-	std::thread([actor, attempts]() {
-		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	auto actorHandle = actor->CreateRefHandle();
 
-		SKSE::GetTaskInterface()->AddTask([actor, attempts]() {
-			if (!actor) return;
-			auto ui = RE::UI::GetSingleton();
-			if (ui && (ui->IsMenuOpen(RE::MainMenu::MENU_NAME) || ui->IsMenuOpen(RE::LoadingMenu::MENU_NAME))) {
-				SKSE::log::info("[Actor3DLoadEventHandler] Operação cancelada. Jogo no Main Menu ou Carregando (Ator {:08X}).", actor->GetFormID());
-				return;
-			}
+	Utils::DelayedDispatcher::Get().PostDelayed(std::chrono::milliseconds(100), [actorHandle, attempts]() {
+		SKSE::GetTaskInterface()->AddTask([actorHandle, attempts]() {
+			if (!actorHandle) return;
+			if (!actorHandle.get()) return;
+
+			auto actor = actorHandle.get();
 			RE::BSTSmartPointer<RE::BSAnimationGraphManager> graphManager;
 			actor->GetAnimationGraphManager(graphManager);
 
 			if (graphManager) {
-				//SKSE::log::info("[Actor3DLoadEventHandler] Graph encontrado para {:08X}. Reconectando...", actor->GetFormID());
-
 				if (actor->IsPlayerRef()) {
 					actor->RemoveAnimationGraphEventSink(BFCO::Hooks::NpcCycleSink::GetSingleton());
 					if (actor->AddAnimationGraphEventSink(BFCO::Hooks::NpcCycleSink::GetSingleton())) {
@@ -846,17 +842,17 @@ void BFCO::Hooks::ScheduleSinkRegistration(RE::Actor* actor, int attempts)
 				}
 				else {
 
-					BFCO::Hooks::NpcCombatTracker::UnregisterSink(actor);
-					BFCO::Hooks::NpcCombatTracker::RegisterSink(actor);
+					BFCO::Hooks::NpcCombatTracker::UnregisterSink(actor.get());
+					BFCO::Hooks::NpcCombatTracker::RegisterSink(actor.get());
 
 					SKSE::log::info("[Actor3DLoadEventHandler] Sink de NPC reconectada (via CombatTracker).");
 				}
 			}
 			else {
-				ScheduleSinkRegistration(actor, attempts + 1);
+				ScheduleSinkRegistration(actor.get(), attempts + 1);
 			}
 			});
-		}).detach();
+		});
 }
 
 RE::BSEventNotifyControl BFCO::Hooks::PC3DLoadEventHandler::ProcessEvent(const RE::TESObjectLoadedEvent* a_event, RE::BSTEventSource<RE::TESObjectLoadedEvent>*)
