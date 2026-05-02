@@ -658,7 +658,6 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
 
 		if (buttonEvent->IsDown()) {
 			if (isPowerAttackKeyPressed) {
-				player->NotifyAnimationGraph("MCO_EndAnimation");
 
 				auto playDirectionalPowerAttack = [](RE::Actor* p) {
 					if (BFCOIdles::PowerDirA && BFCOIdles::PowerDirA->conditions.IsTrue(p, p)) {
@@ -725,24 +724,14 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(RE::InputEvent* const*
 			}
 
 			if (comboKeyPressed) {
-				if (BFCOIdles::SprintPower->conditions.IsTrue(player, player)) {
-					player->NotifyAnimationGraph("MCO_EndAnimation");
-					BFCOIdles::PlayIdleAnimation(player, BFCOIdles::SprintPower);
-				}
-				else if (BFCOIdles::PowerBash->conditions.IsTrue(player, player)) {
-					player->NotifyAnimationGraph("MCO_EndAnimation");
-					BFCOIdles::PlayIdleAnimation(player, BFCOIdles::PowerBash);
-				}
-				else {
 					player->NotifyAnimationGraph("MCO_EndAnimation");
 					player->NotifyAnimationGraph("BFCOAttackStart_Comb");
 					BFCOIdles::PlayIdleAnimation(player, BFCOIdles::ComboAttack); 
-				}
 			}
 		}
 
 		if (buttonEvent->IsUp()) {
-			if (isPowerAttackKeyPressed) {
+			if (isPowerAttackKeyPressed || comboKeyPressed) {
 				player->NotifyAnimationGraph("BFCOAttackstart_1");
 			}
 		}
