@@ -62,11 +62,11 @@ void OnMessage(SKSE::MessagingInterface::Message* message) {
         BFCO::Hooks::NpcCombatTracker::RegisterSinksForExistingCombatants();
         auto player = RE::PlayerCharacter::GetSingleton();
         player->AddAnimationGraphEventSink(BFCO::Hooks::NpcCycleSink::GetSingleton());
+        BFCOMenu::UpdateGameGlobals();
     }
 }
 
 SKSEPluginLoad(const SKSE::LoadInterface *skse) {
-
     SetupLog();
     logger::info("Plugin loaded");
     SKSE::Init(skse);

@@ -609,8 +609,7 @@ namespace BFCOMenu {
             return;
         }
         const std::string bfco = "SCSI-ACTbfco-Main.esp";
-		auto player = RE::PlayerCharacter::GetSingleton();
-        // Mapeia nossas variáveis C++ para os EditorIDs das Globals no .esp
+
         std::map<const char*, float> globalsToUpdate = {
             {"bfcoTG_KeyAttackComb", Settings::bEnableComboAttack ? 1.0f : 0.0f},
             {"bfcoINT_KeyAttackComb", Settings::bEnableComboAttack ? 2.0f : 0.0f},
@@ -618,10 +617,7 @@ namespace BFCOMenu {
             {"bfcoTG_DirPowerAttack", Settings::bEnableDirectionalAttack ? 1.0f : 0.0f},
             {"bfcoTG_InputType", static_cast<float>(Settings::bPowerAttackLMB)},            
         };
-        player->SetGraphVariableInt("BFCO_VanillaAnimationType", Settings::AnimationType);
-		logger::info("Player Graph Variable 'BFCO_VanillaAnimationType' set to: {}", Settings::AnimationType);
-		player->SetGraphVariableBool("BFCO_InstantBlock", Settings::bInstantBlock);
-		logger::info("Player Graph Variable 'BFCO_InstantBlock' set to: {}", Settings::bInstantBlock);
+
         for (auto const& [editorID, value] : globalsToUpdate) {
             RE::TESGlobal* global = RE::TESForm::LookupByEditorID<RE::TESGlobal>(editorID);
             if (global) {
@@ -632,18 +628,25 @@ namespace BFCOMenu {
                 SKSE::log::warn("Nao foi possivel encontrar a GlobalVariable: {}", editorID);
             }
         }
-
         auto iniCollection = RE::INISettingCollection::GetSingleton();
         if (iniCollection) {
             RE::Setting* setting = iniCollection->GetSetting("fSubsequentPowerAttackDelay:Controls");
             if (setting) {
                 float delayValue = (Settings::bPowerAttackLMB == 2) ? 0.3f : 2.0f;
                 setting->data.f = delayValue;
-                SKSE::log::info("INI 'fSubsequentPowerAttackDelay:Controls' alterado para: {}", delayValue);
             }
             else {
                 SKSE::log::warn("Aviso: Configuração INI 'fSubsequentPowerAttackDelay:Controls' nao encontrada.");
             }
+        }
+        auto player = RE::PlayerCharacter::GetSingleton();
+        if (player) {
+            player->SetGraphVariableInt("BFCO_VanillaAnimationType", Settings::AnimationType);
+            player->SetGraphVariableBool("BFCO_InstantBlock", Settings::bInstantBlock);
+            SKSE::log::info("Variaveis do Player Graph atualizadas com sucesso.");
+        }
+        else {
+            SKSE::log::warn("Player não carregado ainda. Variáveis de Graph serão aplicadas depois.");
         }
     }
     // Registra o menu
