@@ -3,7 +3,7 @@
 #include <math.h>
 #include <shared_mutex>
 #include "settings.h"
-
+#include "DelayedDispatcher.h"
 // https://blackdoor.github.io/blog/thumbstick-controls/
 
 static inline double GetAngle(RE::NiPoint2 a_vec)
@@ -212,8 +212,15 @@ namespace BFCOIdles {
 		PowerDirB = GetIdleByFormID(0x946, pluginName);
 		PowerDirL = GetIdleByFormID(0x947, pluginName);
 		PowerDirR = GetIdleByFormID(0x948, pluginName);
+		PowerDirA3rd = GetIdleByFormID(0x955, pluginName);
+		PowerDirB3rd = GetIdleByFormID(0x953, pluginName);
+		PowerDirL3rd = GetIdleByFormID(0x952, pluginName);
+		PowerDirR3rd = GetIdleByFormID(0x954, pluginName);
 		CancelDodge = GetIdleByFormID(0x949, pluginName);
-		PowerRight = RE::TESForm::LookupByID<RE::BGSAction>(0xE8456);
+		//PowerRight = RE::TESForm::LookupByID<RE::BGSAction>(0xE8456);
+		PowerRight = GetIdleByFormID(0x19B26, skyrim);
+		SpecialAttack = GetIdleByFormID(0x8A7, pluginName);
+		PowerSpecialAttack = GetIdleByFormID(0x8AF, pluginName);
 
 	}
 
@@ -552,208 +559,228 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(const SKSE::ModCallbac
 
 	std::string_view eventName = a_event->eventName.c_str();
 	int inputID = static_cast<int>(a_event->numArg);
-	auto player = RE::PlayerCharacter::GetSingleton();
-	if (!player || !player->Is3DLoaded()) {
+
+	// --- Sincronização Dinâmica em Tempo Real com o Tween Menu ---
+	if (eventName == "TweenPause_ControlUpdated") {
+		rapidjson::Document doc;
+		doc.Parse(a_event->strArg.c_str());
+
+		if (!doc.HasParseError() && doc.IsObject()) {
+			std::string actionId = doc["actionId"].GetString();
+
+			if (actionId == "ComboAttack" || actionId == "PowerAttack" || actionId == "SpecialAttack" || actionId == "PowerSpecialAttack") {
+				BFCOMenu::UnregisterInputCategory(actionId);
+
+				std::vector<int> newActions;
+				std::vector<int> newMotions;
+
+				if (doc.HasMember("mappedIds") && doc["mappedIds"].IsArray()) {
+					for (auto& bind : doc["mappedIds"].GetArray()) {
+						if (bind.HasMember("actionID") && bind["actionID"].IsInt()) newActions.push_back(bind["actionID"].GetInt());
+						if (bind.HasMember("motionID") && bind["motionID"].IsInt()) newMotions.push_back(bind["motionID"].GetInt());
+					}
+				}
+
+				if (actionId == "ComboAttack") {
+					Settings::ComboActionIDs = newActions;
+					Settings::ComboMotionIDs = newMotions;
+				}
+				else if (actionId == "PowerAttack") {
+					Settings::PowerAttackActionIDs = newActions;
+					Settings::PowerAttackMotionIDs = newMotions;
+				}
+				else if (actionId == "SpecialAttack") {
+					Settings::SpecialAttackActionIDs = newActions;
+					Settings::SpecialAttackMotionIDs = newMotions;
+				}
+				else if (actionId == "PowerSpecialAttack") {
+					Settings::PowerSpecialAttackActionIDs = newActions;
+					Settings::PowerSpecialAttackMotionIDs = newMotions;
+				}
+
+				BFCOMenu::RegisterAllInputs();
+				BFCOMenu::SaveSettings();
+			}
+		}
 		return RE::BSEventNotifyControl::kContinue;
 	}
+
+	auto player = RE::PlayerCharacter::GetSingleton();
+	if (!player || !player->Is3DLoaded() || IsAnyMenuOpen()) {
+		return RE::BSEventNotifyControl::kContinue;
+	}
+
 	const auto playerState = player->AsActorState();
-
-
 	if (!(!player->IsInKillMove() && playerState->GetWeaponState() == RE::WEAPON_STATE::kDrawn &&
 		playerState->GetSitSleepState() == RE::SIT_SLEEP_STATE::kNormal &&
-		playerState->GetKnockState() == RE::KNOCK_STATE_ENUM::kNormal &&
 		playerState->GetKnockState() == RE::KNOCK_STATE_ENUM::kNormal &&
 		playerState->GetFlyState() == RE::FLY_STATE::kNone)) {
 		return RE::BSEventNotifyControl::kContinue;
 	}
-	// ===========================================================
-	// INPUTS DO TIPO: ACTION (Normal)
-	// ===========================================================
-	if (eventName == "InputManager_ActionTriggered") {
 
-		// Verifica se o Combo está configurado como Action (0)
-		if (Settings::ComboInputType == 0 && inputID == Settings::ComboActionID) {
-			//SKSE::log::info("Combo Attack (Action) Triggered!");
-			if (BFCOIdles::SprintPower->conditions.IsTrue(player, player)) {
-				player->NotifyAnimationGraph("MCO_EndAnimation");
-				BFCOIdles::PlayIdleAnimation(player, BFCOIdles::SprintPower);
+	auto HasInput = [](const std::vector<int>& list, int id) {
+		return std::find(list.begin(), list.end(), id) != list.end();
+		};
+
+	auto playDirectionalPowerAttack = [](RE::Actor* p) {
+		if (Settings::bDisableDirPowerCustomInput) {
+			BFCOIdles::PlayIdleAnimation(p, BFCOIdles::PowerNormal);
+			return;
+		}
+
+		if (BFCOIdles::PowerDirA && BFCOIdles::PowerDirA->conditions.IsTrue(p, p)) {
+			BFCOIdles::PlayIdleAnimation(p, BFCOIdles::PowerDirA);
+		}
+		else if (BFCOIdles::PowerDirB && BFCOIdles::PowerDirB->conditions.IsTrue(p, p)) {
+			BFCOIdles::PlayIdleAnimation(p, BFCOIdles::PowerDirB);
+		}
+		else if (BFCOIdles::PowerDirL && BFCOIdles::PowerDirL->conditions.IsTrue(p, p)) {
+			BFCOIdles::PlayIdleAnimation(p, BFCOIdles::PowerDirL);
+		}
+		else if (BFCOIdles::PowerDirR && BFCOIdles::PowerDirR->conditions.IsTrue(p, p)) {
+			BFCOIdles::PlayIdleAnimation(p, BFCOIdles::PowerDirR);
+		}
+		else if (BFCOIdles::PowerDirA3rd && BFCOIdles::PowerDirA3rd->conditions.IsTrue(p, p)) {
+			BFCOIdles::PlayIdleAnimation(p, BFCOIdles::PowerDirA3rd);
+		}
+		else if (BFCOIdles::PowerDirB3rd && BFCOIdles::PowerDirB3rd->conditions.IsTrue(p, p)) {
+			BFCOIdles::PlayIdleAnimation(p, BFCOIdles::PowerDirB3rd);
+		}
+		else if (BFCOIdles::PowerDirL3rd && BFCOIdles::PowerDirL3rd->conditions.IsTrue(p, p)) {
+			BFCOIdles::PlayIdleAnimation(p, BFCOIdles::PowerDirL3rd);
+		}
+		else if (BFCOIdles::PowerDirR3rd && BFCOIdles::PowerDirR3rd->conditions.IsTrue(p, p)) {
+			BFCOIdles::PlayIdleAnimation(p, BFCOIdles::PowerDirR3rd);
+		}
+		else {
+			BFCOIdles::PlayIdleAnimation(p, BFCOIdles::PowerNormal);
+		}
+		};
+
+	// --- PROCESSAMENTO DO DISPARO DE ENTRADAS (ACTION / MOTION) ---
+	bool isAction = (eventName == "InputManager_ActionTriggered");
+	bool isMotion = (eventName == "InputManager_MotionTriggered");
+
+	if (isAction || isMotion) {
+
+		// 1. Combo Attack Latch
+		if (Settings::bEnableComboAttack && ((isAction && HasInput(Settings::ComboActionIDs, inputID)) || (isMotion && HasInput(Settings::ComboMotionIDs, inputID)))) {
+			if (Settings::bLockComboPerk && Settings::comboPerkID != 0) {
+				auto perk = RE::TESForm::LookupByID<RE::BGSPerk>(Settings::comboPerkID);
+				if (perk && !player->HasPerk(perk)) return RE::BSEventNotifyControl::kContinue;
 			}
-			else if (BFCOIdles::PowerBash->conditions.IsTrue(player, player)) {
-				player->NotifyAnimationGraph("MCO_EndAnimation");
-				BFCOIdles::PlayIdleAnimation(player, BFCOIdles::PowerBash);
+
+			if (isComboActive) {
+				isComboActive = false;
+				player->NotifyAnimationGraph("BFCOAttackstart_1");
 			}
 			else {
+				isComboActive = true;
 				player->NotifyAnimationGraph("MCO_EndAnimation");
 				player->NotifyAnimationGraph("BFCOAttackStart_Comb");
 				BFCOIdles::PlayIdleAnimation(player, BFCOIdles::ComboAttack);
 			}
+			return RE::BSEventNotifyControl::kContinue;
 		}
 
-		// Verifica se o Power Attack está configurado como Action (0)
-		if (Settings::PowerAttackInputType == 0 && inputID == Settings::PowerAttackActionID) {
-			//SKSE::log::info("Power Attack (Action) Triggered!");
+		// 2. Power Attack Execution
+		if (Settings::bEnablePowerAttack && ((isAction && HasInput(Settings::PowerAttackActionIDs, inputID)) || (isMotion && HasInput(Settings::PowerAttackMotionIDs, inputID)))) {
+			if (Settings::bLockPowerPerk && Settings::powerPerkID != 0) {
+				auto perk = RE::TESForm::LookupByID<RE::BGSPerk>(Settings::powerPerkID);
+				if (perk && !player->HasPerk(perk)) return RE::BSEventNotifyControl::kContinue;
+			}
 			player->NotifyAnimationGraph("MCO_EndAnimation");
-
-			auto playDirectionalPowerAttack = [](RE::Actor* p) {
-				if (BFCOIdles::PowerDirA && BFCOIdles::PowerDirA->conditions.IsTrue(p, p)) {
-					BFCOIdles::PlayIdleAnimation(p, BFCOIdles::PowerDirA);
-				}
-				else if (BFCOIdles::PowerDirB && BFCOIdles::PowerDirB->conditions.IsTrue(p, p)) {
-					BFCOIdles::PlayIdleAnimation(p, BFCOIdles::PowerDirB);
-				}
-				else if (BFCOIdles::PowerDirL && BFCOIdles::PowerDirL->conditions.IsTrue(p, p)) {
-					BFCOIdles::PlayIdleAnimation(p, BFCOIdles::PowerDirL);
-				}
-				else if (BFCOIdles::PowerDirR && BFCOIdles::PowerDirR->conditions.IsTrue(p, p)) {
-					BFCOIdles::PlayIdleAnimation(p, BFCOIdles::PowerDirR);
-				}
-				else if (BFCOIdles::PowerNormal && BFCOIdles::PowerNormal->conditions.IsTrue(p, p)) {
-					BFCOIdles::PlayIdleAnimation(p, BFCOIdles::PowerNormal);
-				}
-				else {
-					BFCOIdles::PerformAction(BFCOIdles::PowerRight, p);
-				}
-				};
-
 
 			if (BFCOIdles::JumpPower && BFCOIdles::JumpPower->conditions.IsTrue(player, player)) {
 				player->NotifyAnimationGraph("BfcoJumpStop");
-
 				auto playerHandle = player->GetHandle();
 				std::thread([playerHandle]() {
 					std::this_thread::sleep_for(std::chrono::milliseconds(50));
 					SKSE::GetTaskInterface()->AddTask([playerHandle]() {
-						if (auto p = playerHandle.get()) {
-							BFCOIdles::PlayIdleAnimation(p.get(), BFCOIdles::JumpPower);
-						}
+						if (auto p = playerHandle.get()) BFCOIdles::PlayIdleAnimation(p.get(), BFCOIdles::JumpPower);
 						});
 					}).detach();
-
 			}
 			else if (BFCOIdles::SprintPower && BFCOIdles::SprintPower->conditions.IsTrue(player, player)) {
 				BFCOIdles::PlayIdleAnimation(player, BFCOIdles::SprintPower);
-
 			}
 			else if (BFCOIdles::PowerBash && BFCOIdles::PowerBash->conditions.IsTrue(player, player)) {
 				BFCOIdles::PlayIdleAnimation(player, BFCOIdles::PowerBash);
-
 			}
 			else {
 				if (BFCOIdles::CancelDodge && BFCOIdles::CancelDodge->conditions.IsTrue(player, player)) {
 					BFCOIdles::PlayIdleAnimation(player, BFCOIdles::CancelDodge);
-
 					auto playerHandle = player->GetHandle();
 					std::thread([playerHandle, playDirectionalPowerAttack]() {
 						std::this_thread::sleep_for(std::chrono::milliseconds(50));
 						SKSE::GetTaskInterface()->AddTask([playerHandle, playDirectionalPowerAttack]() {
-							if (auto p = playerHandle.get()) {
-								playDirectionalPowerAttack(p.get());
-							}
+							if (auto p = playerHandle.get()) playDirectionalPowerAttack(p.get());
 							});
 						}).detach();
 				}
 				else {
 					playDirectionalPowerAttack(player);
 				}
+			}
+
+			if (isMotion) player->NotifyAnimationGraph("BFCOAttackstart_1");
+			return RE::BSEventNotifyControl::kContinue;
+		}
+
+		// 3. Special Attack Execution
+		if (Settings::bEnableSpecialAttack && ((isAction && HasInput(Settings::SpecialAttackActionIDs, inputID)) || (isMotion && HasInput(Settings::SpecialAttackMotionIDs, inputID)))) {
+			if (Settings::bLockSpecialPerk && Settings::specialPerkID != 0) {
+				auto perk = RE::TESForm::LookupByID<RE::BGSPerk>(Settings::specialPerkID);
+				if (perk && !player->HasPerk(perk)) return RE::BSEventNotifyControl::kContinue;
+			}
+			player->NotifyAnimationGraph("MCO_EndAnimation");
+			player->SetGraphVariableInt("BFCO_SAtkEnable", 1);
+			if (BFCOIdles::SpecialAttack && BFCOIdles::SpecialAttack->conditions.IsTrue(player, player)) {
+				BFCOIdles::PlayIdleAnimation(player, BFCOIdles::SpecialAttack);
+				
+			}
+			if (Settings::bDisableSpecialAttack) {
+				player->SetGraphVariableInt("BFCO_SAtkEnable", 0);
 			}
 			
+			return RE::BSEventNotifyControl::kContinue;
+		}
+
+		// 4. Power Special Attack Execution
+		if (Settings::bEnableSpecialPowerAttack && ((isAction && HasInput(Settings::PowerSpecialAttackActionIDs, inputID)) || (isMotion && HasInput(Settings::PowerSpecialAttackMotionIDs, inputID)))) {
+			if (Settings::bLockPowerSpecialPerk && Settings::powerSpecialPerkID != 0) {
+				auto perk = RE::TESForm::LookupByID<RE::BGSPerk>(Settings::powerSpecialPerkID);
+				if (perk && !player->HasPerk(perk)) return RE::BSEventNotifyControl::kContinue;
+			}
+			player->NotifyAnimationGraph("MCO_EndAnimation");
+			player->SetGraphVariableInt("BFCO_PSAtkEnable", 1);
+			if (BFCOIdles::PowerSpecialAttack && BFCOIdles::PowerSpecialAttack->conditions.IsTrue(player, player)) {
+				BFCOIdles::PlayIdleAnimation(player, BFCOIdles::PowerSpecialAttack);
+				
+			}
+			
+			if (Settings::bDisablePowerSpecialAttack) {
+				player->SetGraphVariableInt("BFCO_PSAtkEnable", 0);
+			}
+			return RE::BSEventNotifyControl::kContinue;
 		}
 	}
-	else if (eventName == "InputManager_ActionReleased") {
-		if (Settings::PowerAttackInputType == 0 && inputID == Settings::PowerAttackActionID) {
+
+	// --- PROCESSAMENTO DO EVENTO RELEASE DE ENTRADAS ---
+	if (eventName == "InputManager_ActionReleased") {
+		if (Settings::bEnableComboAttack && HasInput(Settings::ComboActionIDs, inputID)) {
+			if (isComboActive) {
+				isComboActive = false;
+				player->NotifyAnimationGraph("BFCOAttackstart_1");
+			}
+		}
+		if (Settings::bEnablePowerAttack && HasInput(Settings::PowerAttackActionIDs, inputID)) {
 			player->NotifyAnimationGraph("BFCOAttackstart_1");
 		}
-	}
-	// ===========================================================
-	// INPUTS DO TIPO: MOTION (Sequência)
-	// ===========================================================
-	else if (eventName == "InputManager_MotionTriggered") {
-
-		// Verifica se o Combo está configurado como Motion (1)
-		if (Settings::ComboInputType == 1 && inputID == Settings::ComboMotionID) {
-			//SKSE::log::info("Combo Attack (Motion) Triggered!");
-			if (BFCOIdles::SprintPower->conditions.IsTrue(player, player)) {
-				player->NotifyAnimationGraph("MCO_EndAnimation");
-				BFCOIdles::PlayIdleAnimation(player, BFCOIdles::SprintPower);
-			}
-			else if (BFCOIdles::PowerBash->conditions.IsTrue(player, player)) {
-				player->NotifyAnimationGraph("MCO_EndAnimation");
-				BFCOIdles::PlayIdleAnimation(player, BFCOIdles::PowerBash);
-			}
-			else {
-				player->NotifyAnimationGraph("MCO_EndAnimation");
-				player->NotifyAnimationGraph("BFCOAttackStart_Comb");
-				BFCOIdles::PlayIdleAnimation(player, BFCOIdles::ComboAttack);
-			}
+		if (Settings::bEnableSpecialAttack && HasInput(Settings::SpecialAttackActionIDs, inputID)) {
+			player->NotifyAnimationGraph("BFCOAttackstart_1");
 		}
-
-		// Verifica se o Power Attack está configurado como Motion (1)
-		if (Settings::PowerAttackInputType == 1 && inputID == Settings::PowerAttackMotionID) {
-			//SKSE::log::info("Power Attack (Motion) Triggered!");
-			player->NotifyAnimationGraph("MCO_EndAnimation");
-
-			auto playDirectionalPowerAttack = [](RE::Actor* p) {
-				if (BFCOIdles::PowerDirA && BFCOIdles::PowerDirA->conditions.IsTrue(p, p)) {
-					BFCOIdles::PlayIdleAnimation(p, BFCOIdles::PowerDirA);
-				}
-				else if (BFCOIdles::PowerDirB && BFCOIdles::PowerDirB->conditions.IsTrue(p, p)) {
-					BFCOIdles::PlayIdleAnimation(p, BFCOIdles::PowerDirB);
-				}
-				else if (BFCOIdles::PowerDirL && BFCOIdles::PowerDirL->conditions.IsTrue(p, p)) {
-					BFCOIdles::PlayIdleAnimation(p, BFCOIdles::PowerDirL);
-				}
-				else if (BFCOIdles::PowerDirR && BFCOIdles::PowerDirR->conditions.IsTrue(p, p)) {
-					BFCOIdles::PlayIdleAnimation(p, BFCOIdles::PowerDirR);
-				}
-				else if (BFCOIdles::PowerNormal && BFCOIdles::PowerNormal->conditions.IsTrue(p, p)) {
-					BFCOIdles::PlayIdleAnimation(p, BFCOIdles::PowerNormal);
-				}
-				else {
-					BFCOIdles::PerformAction(BFCOIdles::PowerRight, p);
-				}
-				};
-
-
-			if (BFCOIdles::JumpPower && BFCOIdles::JumpPower->conditions.IsTrue(player, player)) {
-				player->NotifyAnimationGraph("BfcoJumpStop");
-
-				auto playerHandle = player->GetHandle();
-				std::thread([playerHandle]() {
-					std::this_thread::sleep_for(std::chrono::milliseconds(50));
-					SKSE::GetTaskInterface()->AddTask([playerHandle]() {
-						if (auto p = playerHandle.get()) {
-							BFCOIdles::PlayIdleAnimation(p.get(), BFCOIdles::JumpPower);
-						}
-						});
-					}).detach();
-
-			}
-			else if (BFCOIdles::SprintPower && BFCOIdles::SprintPower->conditions.IsTrue(player, player)) {
-				BFCOIdles::PlayIdleAnimation(player, BFCOIdles::SprintPower);
-
-			}
-			else if (BFCOIdles::PowerBash && BFCOIdles::PowerBash->conditions.IsTrue(player, player)) {
-				BFCOIdles::PlayIdleAnimation(player, BFCOIdles::PowerBash);
-
-			}
-			else {
-				if (BFCOIdles::CancelDodge && BFCOIdles::CancelDodge->conditions.IsTrue(player, player)) {
-					BFCOIdles::PlayIdleAnimation(player, BFCOIdles::CancelDodge);
-
-					auto playerHandle = player->GetHandle();
-					std::thread([playerHandle, playDirectionalPowerAttack]() {
-						std::this_thread::sleep_for(std::chrono::milliseconds(50));
-						SKSE::GetTaskInterface()->AddTask([playerHandle, playDirectionalPowerAttack]() {
-							if (auto p = playerHandle.get()) {
-								playDirectionalPowerAttack(p.get());
-							}
-							});
-						}).detach();
-				}
-				else {
-					playDirectionalPowerAttack(player);
-				}
-			}
+		if (Settings::bEnableSpecialPowerAttack && HasInput(Settings::PowerSpecialAttackActionIDs, inputID)) {
 			player->NotifyAnimationGraph("BFCOAttackstart_1");
 		}
 	}
@@ -821,42 +848,39 @@ void BFCO::Hooks::ScheduleSinkRegistration(RE::Actor* actor, int attempts)
 		return;
 	}
 
-	std::thread([actor, attempts]() {
-		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	auto actorHandle = actor->CreateRefHandle();
 
-		SKSE::GetTaskInterface()->AddTask([actor, attempts]() {
-			if (!actor) return;
-			auto ui = RE::UI::GetSingleton();
-			if (ui && (ui->IsMenuOpen(RE::MainMenu::MENU_NAME) || ui->IsMenuOpen(RE::LoadingMenu::MENU_NAME))) {
-				//SKSE::log::info("[Actor3DLoadEventHandler] Operação cancelada. Jogo no Main Menu ou Carregando (Ator {:08X}).", actor->GetFormID());
-				return;
-			}
+	Utils::DelayedDispatcher::Get().PostDelayed(std::chrono::milliseconds(100), [actorHandle, attempts]() {
+		SKSE::GetTaskInterface()->AddTask([actorHandle, attempts]() {
+			if (!actorHandle) return;
+			if (!actorHandle.get()) return;
+
+			auto actor = actorHandle.get();
+
 			RE::BSTSmartPointer<RE::BSAnimationGraphManager> graphManager;
 			actor->GetAnimationGraphManager(graphManager);
 
 			if (graphManager) {
-				SKSE::log::info("[Actor3DLoadEventHandler] Graph encontrado para {:08X}. Reconectando...", actor->GetFormID());
+
 
 				if (actor->IsPlayerRef()) {
-					actor->RemoveAnimationGraphEventSink(BFCO::Hooks::NpcCycleSink::GetSingleton());
-					if (actor->AddAnimationGraphEventSink(BFCO::Hooks::NpcCycleSink::GetSingleton())) {
+					actor->RemoveAnimationGraphEventSink(NpcCycleSink::GetSingleton());
+					if (actor->AddAnimationGraphEventSink(NpcCycleSink::GetSingleton())) {
 						SKSE::log::info("[Actor3DLoadEventHandler] Sink do PLAYER reconectada com sucesso.");
 					}
 
 				}
 				else {
-
-					BFCO::Hooks::NpcCombatTracker::UnregisterSink(actor);
-					BFCO::Hooks::NpcCombatTracker::RegisterSink(actor);
-
-					//SKSE::log::info("[Actor3DLoadEventHandler] Sink de NPC reconectada (via CombatTracker).");
+					NpcCombatTracker::UnregisterSink(actor.get());
+					NpcCombatTracker::RegisterSink(actor.get());
 				}
 			}
 			else {
-				ScheduleSinkRegistration(actor, attempts + 1);
+				// Graph ainda nulo, tenta de novo
+				ScheduleSinkRegistration(actor.get(), attempts + 1);
 			}
 			});
-		}).detach();
+		});
 }
 
 RE::BSEventNotifyControl BFCO::Hooks::PC3DLoadEventHandler::ProcessEvent(const RE::TESObjectLoadedEvent* a_event, RE::BSTEventSource<RE::TESObjectLoadedEvent>*)

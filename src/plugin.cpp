@@ -1,23 +1,16 @@
 ﻿#include "logger.h"
 #include "Events.h"
 #include"Settings.h"
+#include "Manager.h"
+
 void OnMessage(SKSE::MessagingInterface::Message* message) {
     if (message->type == InputManagerAPI::kMessage_ProvideAPI) {
         InputManagerAPI::ReceiveAPI(message);
         logger::info("API do Input Manager recebida com sucesso via SKSE Message!");
     }
     if (message->type == SKSE::MessagingInterface::kDataLoaded) {
-        InputManagerAPI::RequestAPIDirect();
-
-        if (InputManagerAPI::_API) {
-            logger::info("API do Input Manager conectada via Windows DLL Export!");
-        }
-        else {
-            InputManagerAPI::RequestAPI();
-        }
-
         AttackStateManager::GetSingleton()->Register();
-        BFCO::InstallHooks();
+        //BFCO::InstallHooks();
         BFCOIdles::InitIdles();
         RE::ScriptEventSourceHolder::GetSingleton()->AddEventSink(BFCO::Hooks::PC3DLoadEventHandler::GetSingleton());
         if (GetModuleHandleA("SCAR.dll")) {
@@ -36,27 +29,23 @@ void OnMessage(SKSE::MessagingInterface::Message* message) {
             BFCO::CMF = false;
             logger::info("CycleMovesets.dll not found.");
         }
-		BFCOMenu::Register();
-        if (InputManagerAPI::_API) {
-            if (Settings::bEnableComboAttack) {
-                if (Settings::ComboInputType == 0 && Settings::ComboActionID != -1) {
-                    InputManagerAPI::_API->UpdateListener(0, Settings::ComboActionID, "BFCO", "Combo Attack", true, nullptr, 0, nullptr, 0);
-                }
-                else if (Settings::ComboInputType == 1 && Settings::ComboMotionID != -1) {
-                    InputManagerAPI::_API->UpdateListener(1, Settings::ComboMotionID, "BFCO", "Combo Attack", true, nullptr, 0, nullptr, 0);
-                }
-            }
-
-            if (Settings::bEnablePowerAttack) {
-                if (Settings::PowerAttackInputType == 0 && Settings::PowerAttackActionID != -1) {
-                    InputManagerAPI::_API->UpdateListener(0, Settings::PowerAttackActionID, "BFCO", "Power Attack", true, nullptr, 0, nullptr, 0);
-                }
-                else if (Settings::PowerAttackInputType == 1 && Settings::PowerAttackMotionID != -1) {
-                    InputManagerAPI::_API->UpdateListener(1, Settings::PowerAttackMotionID, "BFCO", "Power Attack", true, nullptr, 0, nullptr, 0);
-                }
-            }
-        }
+        Manager::GetSingleton()->PopulateAllLists();
     }
+    if(message->type == SKSE::MessagingInterface::kPostLoad) {
+        InputManagerAPI::RequestAPIDirect();
+
+        if (InputManagerAPI::_API) {
+            logger::info("API do Input Manager conectada via Windows DLL Export!");
+        }
+        else {
+            InputManagerAPI::RequestAPI();
+        }
+        BFCOMenu::Register();
+        if (InputManagerAPI::_API) {
+            BFCOMenu::RegisterAllInputs();
+            BFCOMenu::TweenPauseRegister();
+        }
+	}
     if (message->type == SKSE::MessagingInterface::kNewGame || message->type == SKSE::MessagingInterface::kPostLoadGame) {
         RE::ScriptEventSourceHolder::GetSingleton()->AddEventSink(BFCO::Hooks::NpcCombatTracker::GetSingleton());
         BFCO::Hooks::NpcCombatTracker::RegisterSinksForExistingCombatants();

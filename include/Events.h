@@ -15,8 +15,14 @@ namespace BFCOIdles {
 	inline RE::TESIdleForm* PowerDirB = nullptr;
 	inline RE::TESIdleForm* PowerDirL = nullptr;
 	inline RE::TESIdleForm* PowerDirR = nullptr;
+	inline RE::TESIdleForm* PowerDirA3rd = nullptr;
+	inline RE::TESIdleForm* PowerDirB3rd = nullptr;
+	inline RE::TESIdleForm* PowerDirL3rd = nullptr;
+	inline RE::TESIdleForm* PowerDirR3rd = nullptr;
+	inline RE::TESIdleForm* SpecialAttack = nullptr;
+	inline RE::TESIdleForm* PowerSpecialAttack = nullptr;
 
-	inline RE::BGSAction* PowerRight = nullptr;
+	inline RE::TESIdleForm* PowerRight = nullptr;
 	inline void PerformAction(RE::BGSAction* action, RE::Actor* player);
 
 	inline RE::TESIdleForm* GetIdleByFormID(RE::FormID formID, const std::string& pluginName);
@@ -36,7 +42,7 @@ public:
 	static inline bool CMF = false;
 	static void InstallHooks()
 	{
-		Hooks::Install();
+		//Hooks::Install();
 	}
 
 	enum class Direction
@@ -165,7 +171,7 @@ public:
 
 	RE::BSEventNotifyControl ProcessEvent(const SKSE::ModCallbackEvent* a_event,
 		RE::BSTEventSource<SKSE::ModCallbackEvent>*) override;
-
+	bool isComboActive = false;
 private:
 
 };

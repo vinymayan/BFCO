@@ -3,6 +3,11 @@
 #include <string>
 #include "SKSEMCP/SKSEMenuFramework.hpp"
 #include "InputManagerAPI.h"
+#include "rapidjson/document.h"
+#include "rapidjson/filereadstream.h"
+#include "rapidjson/filewritestream.h"
+#include "rapidjson/writer.h"
+#include "rapidjson/stringbuffer.h"
 
 inline const char* actionStateNames[] = { "Ignore", "Tap", "Hold", "Gesture", "Press" };
 
@@ -111,24 +116,45 @@ inline const int gamepadKeyIDs[] = {
 };
 
 namespace Settings {
+    inline std::vector<int> ComboActionIDs;
+    inline std::vector<int> ComboMotionIDs;
+    inline std::vector<int> PowerAttackActionIDs;
+    inline std::vector<int> PowerAttackMotionIDs;
+    inline std::vector<int> SpecialAttackActionIDs;
+    inline std::vector<int> SpecialAttackMotionIDs;
+    inline std::vector<int> PowerSpecialAttackActionIDs;
+    inline std::vector<int> PowerSpecialAttackMotionIDs;
     // Checkboxes (baseado no seu MCM)
     inline bool bEnableComboAttack = true;
     inline bool bEnableDirectionalAttack = false;
+    inline bool bEnableSpecialPowerAttack = true;
+    inline bool bEnableSpecialAttack = true;
     inline bool bEnablePowerAttack = true;
     inline bool bDisableJumpingAttack = false;
+    inline bool bDisableSpecialAttack = false;
+    inline bool bDisablePowerSpecialAttack = false;
     inline int bPowerAttackLMB = 0;
     static inline bool bInstantBlock = true;
     static inline int AnimationType = 0;
-    inline int PowerAttackActionID = -1;
-    inline int ComboActionID = -1;
-    inline int ComboInputType = 0;        // 0 = Action, 1 = Motion
-    inline int ComboMotionID = -1;
-    inline int PowerAttackInputType = 0;  // 0 = Action, 1 = Motion
-    inline int PowerAttackMotionID = -1;
+
+    // Sistemas de bloqueio por Perk e Input Direcional Customizado
+    inline bool bLockComboPerk = false;
+    inline RE::FormID comboPerkID = 0;
+    inline bool bLockPowerPerk = false;
+    inline RE::FormID powerPerkID = 0;
+    inline bool bLockSpecialPerk = false;
+    inline RE::FormID specialPerkID = 0;
+    inline bool bLockPowerSpecialPerk = false;
+    inline RE::FormID powerSpecialPerkID = 0;
+    inline bool bDisableDirPowerCustomInput = false;
+
 }
 
 // Namespace para organizar as funções do nosso menu
 namespace BFCOMenu {
+    void UnregisterInputCategory(const std::string& actionId);
+    void TweenPauseRegister();
+    void RegisterAllInputs();
     // Registra o menu no SKSE Menu Framework
     void Register();
 
