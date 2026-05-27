@@ -451,6 +451,9 @@ RE::BSEventNotifyControl BFCO::Hooks::NpcCycleSink::ProcessEvent(const RE::BSAni
 		else if (eventName == "attackStop") {
 			StaminaManager::RestoreSprintStamina();
 		}
+		else if (eventName == "MCO_Recovery") {
+			npc->NotifyAnimationGraph("BFCO_MoveStart");
+		}
 	}
 
 	return RE::BSEventNotifyControl::kContinue;

@@ -11,8 +11,9 @@ namespace ImGui = ImGuiMCP;
 
 namespace BFCOMenu {
 
-    const char* SETTINGS_PATH = "Data/SKSE/Plugins/BFCO_Settings.json";
-    const char* LANG_PATH = "Data/SKSE/Plugins/BFCO_Language.json";
+    const char* SETTINGS_PATH = "Data/SKSE/Plugins/BFCO NG/Settings.json";
+    const char* OLD_SETTINGS_PATH = "Data/SKSE/Plugins/BFCO_Settings.json";
+    const char* LANG_PATH = "Data/SKSE/Plugins/BFCO NG/Language.json";
     static std::unordered_map<std::string, std::string> LangMap;
 
     void LoadLanguage() {
@@ -217,7 +218,7 @@ namespace BFCOMenu {
         ImGui::TextColored({ 0.4f, 1.0f, 0.4f, 1.0f }, "%s", label);
 
         if (!InputManagerAPI::_API) {
-            ImGui::TextDisabled("[Input Manager not found in memory]");
+            ImGui::TextDisabled("%s", GetLoc("menu.input_manager_missing", "[Input Manager not found in memory]"));
             return;
         }
 
@@ -230,11 +231,12 @@ namespace BFCOMenu {
         std::string editPopupId = "EditActionPopup_" + actionIdStr;
 
         auto DrawSelectedList = [&](std::vector<int>& list, int type, const char* typeName) {
+            const char* localizedType = (type == 0) ? GetLoc("common.action", "Action") : GetLoc("common.motion", "Motion");
             for (size_t i = 0; i < list.size(); i++) {
                 ImGui::PushID((std::string(typeName) + "_" + std::to_string(i) + actionIdStr).c_str());
 
                 const char* name = InputManagerAPI::_API->GetInputName(type, list[i]);
-                std::string displayName = std::string("[") + typeName + "] [" + std::to_string(list[i]) + "] " + (name ? name : "Unnamed");
+                std::string displayName = std::string("[") + localizedType + "] [" + std::to_string(list[i]) + "] " + (name ? name : GetLoc("common.unnamed", "Unnamed"));
 
                 ImGui::Text("%s", displayName.c_str());
 
@@ -267,7 +269,7 @@ namespace BFCOMenu {
         // POPUP EDIÇÃO DE AÇÃO
         if (ImGui::BeginPopup(editPopupId.c_str())) {
             if (editingActionId != -1 && editStagingInfo.isValid) {
-                ImGui::TextColored({ 0.4f, 1.0f, 0.4f, 1.0f }, "%s: %s", GetLoc("menu.editing_action", "Editing Action"), editStagingInfo.name ? editStagingInfo.name : "Unnamed");
+                ImGui::TextColored({ 0.4f, 1.0f, 0.4f, 1.0f }, "%s: %s", GetLoc("menu.editing_action", "Editing Action"), editStagingInfo.name ? editStagingInfo.name : GetLoc("common.unnamed", "Unnamed"));
                 ImGui::Separator();
 
                 int pcKeySize = sizeof(pcKeyIDs) / sizeof(pcKeyIDs[0]);
@@ -300,7 +302,7 @@ namespace BFCOMenu {
                 auto DrawGestureCombo = [](const char* label, uint32_t& current_gesture) {
                     size_t gestCount = InputManagerAPI::_API->GetInputCount(2);
                     int current = static_cast<int>(current_gesture);
-                    const char* preview = (current >= 0 && current < gestCount) ? InputManagerAPI::_API->GetInputName(2, current) : "None";
+                    const char* preview = (current >= 0 && current < gestCount) ? InputManagerAPI::_API->GetInputName(2, current) : GetLoc("common.none", "None");
 
                     if (ImGui::BeginCombo(label, preview)) {
                         for (int i = 0; i < gestCount; ++i) {
@@ -315,8 +317,8 @@ namespace BFCOMenu {
                     };
 
                 auto DrawStickCombo = [](const char* label, int& current_stick) {
-                    const char* sticks[] = { "Left Stick", "Right Stick" };
-                    const char* preview = (current_stick >= 0 && current_stick < 2) ? sticks[current_stick] : "Unknown";
+                    const char* sticks[] = { GetLoc("menu.left_stick", "Left Stick"), GetLoc("menu.right_stick", "Right Stick") };
+                    const char* preview = (current_stick >= 0 && current_stick < 2) ? sticks[current_stick] : GetLoc("common.unnamed", "Unknown");
                     if (ImGui::BeginCombo(label, preview)) {
                         for (int i = 0; i < 2; i++) {
                             bool is_selected = (current_stick == i);
@@ -328,43 +330,43 @@ namespace BFCOMenu {
                     };
 
                 // PC
-                ImGui::TextColored({ 0.7f, 0.7f, 1.0f, 1.0f }, "--- PC Settings ---");
+                ImGui::TextColored({ 0.7f, 0.7f, 1.0f, 1.0f }, "%s", GetLoc("menu.pc_settings_header", "--- PC Settings ---"));
                 int pcMainIdx = GetIndexFromID(editStagingInfo.pcMainKey, pcKeyIDs, pcKeySize);
-                if (SearchableCombo("PC Main Key", &pcMainIdx, pcKeyNames, pcKeySize)) editStagingInfo.pcMainKey = pcKeyIDs[pcMainIdx];
-                DrawMainActionCombo("PC Main Action", editStagingInfo.pcMainAction);
-                if (editStagingInfo.pcMainAction == 1) ImGui::InputInt("PC Main Taps", &editStagingInfo.pcMainTapCount);
+                if (SearchableCombo(GetLoc("menu.pc_main_key", "PC Main Key"), &pcMainIdx, pcKeyNames, pcKeySize)) editStagingInfo.pcMainKey = pcKeyIDs[pcMainIdx];
+                DrawMainActionCombo(GetLoc("menu.pc_main_action", "PC Main Action"), editStagingInfo.pcMainAction);
+                if (editStagingInfo.pcMainAction == 1) ImGui::InputInt(GetLoc("menu.pc_main_taps", "PC Main Taps"), &editStagingInfo.pcMainTapCount);
 
                 if (editStagingInfo.pcModAction == 3 && editStagingInfo.pcMainAction != 2 && editStagingInfo.pcMainAction != 4) editStagingInfo.pcModAction = 0;
 
-                DrawModActionCombo("PC Mod Action", editStagingInfo.pcModAction, editStagingInfo.pcMainAction);
+                DrawModActionCombo(GetLoc("menu.pc_mod_action", "PC Mod Action"), editStagingInfo.pcModAction, editStagingInfo.pcMainAction);
                 if (editStagingInfo.pcModAction == 3) {
-                    DrawGestureCombo("PC Gesture", editStagingInfo.pcModifierKey);
+                    DrawGestureCombo(GetLoc("menu.pc_gesture", "PC Gesture"), editStagingInfo.pcModifierKey);
                 }
                 else {
                     int pcModIdx = GetIndexFromID(editStagingInfo.pcModifierKey, pcKeyIDs, pcKeySize);
-                    if (SearchableCombo("PC Mod Key", &pcModIdx, pcKeyNames, pcKeySize)) editStagingInfo.pcModifierKey = pcKeyIDs[pcModIdx];
-                    if (editStagingInfo.pcModAction == 1) ImGui::InputInt("PC Mod Taps", &editStagingInfo.pcModTapCount);
+                    if (SearchableCombo(GetLoc("menu.pc_mod_key", "PC Mod Key"), &pcModIdx, pcKeyNames, pcKeySize)) editStagingInfo.pcModifierKey = pcKeyIDs[pcModIdx];
+                    if (editStagingInfo.pcModAction == 1) ImGui::InputInt(GetLoc("menu.pc_mod_taps", "PC Mod Taps"), &editStagingInfo.pcModTapCount);
                 }
 
                 // GAMEPAD
                 ImGui::Spacing();
-                ImGui::TextColored({ 0.7f, 1.0f, 0.7f, 1.0f }, "--- Gamepad Settings ---");
+                ImGui::TextColored({ 0.7f, 1.0f, 0.7f, 1.0f }, "%s", GetLoc("menu.pad_settings_header", "--- Gamepad Settings ---"));
                 int padMainIdx = GetIndexFromID(editStagingInfo.gamepadMainKey, gamepadKeyIDs, padKeySize);
-                if (SearchableCombo("Pad Main Key", &padMainIdx, gamepadKeyNames, padKeySize)) editStagingInfo.gamepadMainKey = gamepadKeyIDs[padMainIdx];
-                DrawMainActionCombo("Pad Main Action", editStagingInfo.gamepadMainAction);
-                if (editStagingInfo.gamepadMainAction == 1) ImGui::InputInt("Pad Main Taps", &editStagingInfo.gamepadMainTapCount);
+                if (SearchableCombo(GetLoc("menu.pad_main_key", "Pad Main Key"), &padMainIdx, gamepadKeyNames, padKeySize)) editStagingInfo.gamepadMainKey = gamepadKeyIDs[padMainIdx];
+                DrawMainActionCombo(GetLoc("menu.pad_main_action", "Pad Main Action"), editStagingInfo.gamepadMainAction);
+                if (editStagingInfo.gamepadMainAction == 1) ImGui::InputInt(GetLoc("menu.pad_main_taps", "Pad Main Taps"), &editStagingInfo.gamepadMainTapCount);
 
                 if (editStagingInfo.gamepadModAction == 3 && editStagingInfo.gamepadMainAction != 2 && editStagingInfo.gamepadMainAction != 4) editStagingInfo.gamepadModAction = 0;
 
-                DrawModActionCombo("Pad Mod Action", editStagingInfo.gamepadModAction, editStagingInfo.gamepadMainAction);
+                DrawModActionCombo(GetLoc("menu.pad_mod_action", "Pad Mod Action"), editStagingInfo.gamepadModAction, editStagingInfo.gamepadMainAction);
                 if (editStagingInfo.gamepadModAction == 3) {
-                    DrawGestureCombo("Pad Gesture", editStagingInfo.gamepadModifierKey);
-                    DrawStickCombo("Gesture Stick", editStagingInfo.gamepadGestureStick);
+                    DrawGestureCombo(GetLoc("menu.pad_gesture", "Pad Gesture"), editStagingInfo.gamepadModifierKey);
+                    DrawStickCombo(GetLoc("menu.pad_gesture_stick", "Gesture Stick"), editStagingInfo.gamepadGestureStick);
                 }
                 else {
                     int padModIdx = GetIndexFromID(editStagingInfo.gamepadModifierKey, gamepadKeyIDs, padKeySize);
-                    if (SearchableCombo("Pad Mod Key", &padModIdx, gamepadKeyNames, padKeySize)) editStagingInfo.gamepadModifierKey = gamepadKeyIDs[padModIdx];
-                    if (editStagingInfo.gamepadModAction == 1) ImGui::InputInt("Pad Mod Taps", &editStagingInfo.gamepadModTapCount);
+                    if (SearchableCombo(GetLoc("menu.pad_mod_key", "Pad Mod Key"), &padModIdx, gamepadKeyNames, padKeySize)) editStagingInfo.gamepadModifierKey = gamepadKeyIDs[padModIdx];
+                    if (editStagingInfo.gamepadModAction == 1) ImGui::InputInt(GetLoc("menu.pad_mod_taps", "Pad Mod Taps"), &editStagingInfo.gamepadModTapCount);
                 }
 
                 ImGui::Separator();
@@ -392,7 +394,8 @@ namespace BFCOMenu {
         }
 
         std::string popupId = "AddInputPopup_" + actionIdStr;
-        if (ImGui::Button(("+ Add Input##" + actionIdStr).c_str())) {
+        std::string addInputLabel = std::string(GetLoc("menu.add_input", "+ Add Input")) + "##" + actionIdStr;
+        if (ImGui::Button(addInputLabel.c_str())) {
             ImGui::OpenPopup(popupId.c_str());
         }
 
@@ -427,7 +430,7 @@ namespace BFCOMenu {
 
                     for (int i = 0; i < count; i++) {
                         const char* name = InputManagerAPI::_API->GetInputName(selectedType, i);
-                        std::string itemLabel = "[" + std::to_string(i) + "] " + (name ? name : "Unnamed");
+                        std::string itemLabel = "[" + std::to_string(i) + "] " + (name ? name : GetLoc("common.unnamed", "Unnamed"));
 
                         bool matches = searchLower.empty();
                         if (!matches) matches = (ToLower(itemLabel).find(searchLower) != std::string::npos);
@@ -462,7 +465,7 @@ namespace BFCOMenu {
 
                                 auto getActionName = [](int actionId) -> const char* {
                                     if (actionId >= 0 && actionId < 5) return actionStateNames[actionId];
-                                    return "Unknown";
+                                    return GetLoc("common.unknown", "Unknown");
                                     };
 
                                 auto formatAction = [&](int actionId, int tapCount) -> std::string {
@@ -473,13 +476,29 @@ namespace BFCOMenu {
                                     return n;
                                     };
 
-                                auto getPcKeyName = [](int keyId) -> const char* {
+                                auto getDirectionalName = [](int keyId) -> const char* {
+                                    switch (keyId) {
+                                    case InputManagerAPI::VKEY_DIR_UP:        return GetLoc("direction.up", "Up");
+                                    case InputManagerAPI::VKEY_DIR_DOWN:      return GetLoc("direction.down", "Down");
+                                    case InputManagerAPI::VKEY_DIR_LEFT:      return GetLoc("direction.left", "Left");
+                                    case InputManagerAPI::VKEY_DIR_RIGHT:     return GetLoc("direction.right", "Right");
+                                    case InputManagerAPI::VKEY_DIR_UPRIGHT:   return GetLoc("direction.up_right", "Up-Right");
+                                    case InputManagerAPI::VKEY_DIR_UPLEFT:    return GetLoc("direction.up_left", "Up-Left");
+                                    case InputManagerAPI::VKEY_DIR_DOWNRIGHT: return GetLoc("direction.down_right", "Down-Right");
+                                    case InputManagerAPI::VKEY_DIR_DOWNLEFT:  return GetLoc("direction.down_left", "Down-Left");
+                                    default: return nullptr;
+                                    }
+                                    };
+
+                                auto getPcKeyName = [&](int keyId) -> const char* {
+                                    if (const char* dirName = getDirectionalName(keyId)) return dirName;
                                     int size = sizeof(pcKeyIDs) / sizeof(pcKeyIDs[0]);
                                     int idx = GetIndexFromID(keyId, pcKeyIDs, size);
                                     return pcKeyNames[idx];
                                     };
 
-                                auto getPadKeyName = [](int keyId) -> const char* {
+                                auto getPadKeyName = [&](int keyId) -> const char* {
+                                    if (const char* dirName = getDirectionalName(keyId)) return dirName;
                                     int size = sizeof(gamepadKeyIDs) / sizeof(gamepadKeyIDs[0]);
                                     int idx = GetIndexFromID(keyId, gamepadKeyIDs, size);
                                     return gamepadKeyNames[idx];
@@ -824,6 +843,8 @@ namespace BFCOMenu {
 
     void LoadSettings() {
         FILE* fp = nullptr; fopen_s(&fp, SETTINGS_PATH, "rb");
+        if (!fp) { fopen_s(&fp, OLD_SETTINGS_PATH, "rb"); }
+
         if (fp) {
             char readBuffer[65536]; rapidjson::FileReadStream is(fp, readBuffer, sizeof(readBuffer));
             rapidjson::Document doc; doc.ParseStream(is); fclose(fp);
