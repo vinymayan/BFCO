@@ -10,7 +10,7 @@ void OnMessage(SKSE::MessagingInterface::Message* message) {
     }
     if (message->type == SKSE::MessagingInterface::kDataLoaded) {
         AttackStateManager::GetSingleton()->Register();
-        //BFCO::InstallHooks();
+        BFCO::InstallHooks();
         BFCOIdles::InitIdles();
         RE::ScriptEventSourceHolder::GetSingleton()->AddEventSink(BFCO::Hooks::PC3DLoadEventHandler::GetSingleton());
         if (GetModuleHandleA("SCAR.dll")) {
@@ -49,8 +49,6 @@ void OnMessage(SKSE::MessagingInterface::Message* message) {
     if (message->type == SKSE::MessagingInterface::kNewGame || message->type == SKSE::MessagingInterface::kPostLoadGame) {
         RE::ScriptEventSourceHolder::GetSingleton()->AddEventSink(BFCO::Hooks::NpcCombatTracker::GetSingleton());
         BFCO::Hooks::NpcCombatTracker::RegisterSinksForExistingCombatants();
-        auto player = RE::PlayerCharacter::GetSingleton();
-        player->AddAnimationGraphEventSink(BFCO::Hooks::NpcCycleSink::GetSingleton());
         BFCOMenu::UpdateGameGlobals();
     }
 }

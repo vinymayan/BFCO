@@ -42,7 +42,7 @@ public:
 	static inline bool CMF = false;
 	static void InstallHooks()
 	{
-		//Hooks::Install();
+		Hooks::Install();
 	}
 
 	enum class Direction

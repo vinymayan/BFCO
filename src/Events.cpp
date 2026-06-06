@@ -201,11 +201,11 @@ namespace BFCOIdles {
 		const std::string skyrim = "Skyrim.esm";
 
 		AttackNormal = GetIdleByFormID(0x803, pluginName);
-		PowerNormal = GetIdleByFormID(0x8C5, pluginName);
+		PowerNormal = GetIdleByFormID(0x8F3, pluginName);
 		PowerH2H = GetIdleByFormID(0x839, pluginName);
 		PowerBash = GetIdleByFormID(0x8C0, pluginName);
 		SprintPower = GetIdleByFormID(0x8BE, pluginName);
-		ComboAttack = GetIdleByFormID(0x8BF, pluginName);
+		ComboAttack = GetIdleByFormID(0x8F1, pluginName);
 
 		JumpPower = GetIdleByFormID(0x944, pluginName);
 		PowerDirA = GetIdleByFormID(0x945, pluginName);
@@ -219,8 +219,8 @@ namespace BFCOIdles {
 		CancelDodge = GetIdleByFormID(0x949, pluginName);
 		//PowerRight = RE::TESForm::LookupByID<RE::BGSAction>(0xE8456);
 		PowerRight = GetIdleByFormID(0x19B26, skyrim);
-		SpecialAttack = GetIdleByFormID(0x8A7, pluginName);
-		PowerSpecialAttack = GetIdleByFormID(0x8AF, pluginName);
+		SpecialAttack = GetIdleByFormID(0x94F, pluginName);
+		PowerSpecialAttack = GetIdleByFormID(0x94E, pluginName);
 
 	}
 
@@ -450,9 +450,6 @@ RE::BSEventNotifyControl BFCO::Hooks::NpcCycleSink::ProcessEvent(const RE::BSAni
 		// Retorna ao valor padrão quando o ataque terminar
 		else if (eventName == "attackStop") {
 			StaminaManager::RestoreSprintStamina();
-		}
-		else if (eventName == "MCO_Recovery") {
-			npc->NotifyAnimationGraph("BFCO_MoveStart");
 		}
 	}
 
@@ -864,19 +861,8 @@ void BFCO::Hooks::ScheduleSinkRegistration(RE::Actor* actor, int attempts)
 			actor->GetAnimationGraphManager(graphManager);
 
 			if (graphManager) {
-
-
-				if (actor->IsPlayerRef()) {
-					actor->RemoveAnimationGraphEventSink(NpcCycleSink::GetSingleton());
-					if (actor->AddAnimationGraphEventSink(NpcCycleSink::GetSingleton())) {
-						SKSE::log::info("[Actor3DLoadEventHandler] Sink do PLAYER reconectada com sucesso.");
-					}
-
-				}
-				else {
-					NpcCombatTracker::UnregisterSink(actor.get());
-					NpcCombatTracker::RegisterSink(actor.get());
-				}
+				NpcCombatTracker::UnregisterSink(actor.get());
+				NpcCombatTracker::RegisterSink(actor.get());
 			}
 			else {
 				// Graph ainda nulo, tenta de novo
