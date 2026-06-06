@@ -201,11 +201,11 @@ namespace BFCOIdles {
 		const std::string skyrim = "Skyrim.esm";
 
 		AttackNormal = GetIdleByFormID(0x803, pluginName);
-		PowerNormal = GetIdleByFormID(0x8F3, pluginName);
+		PowerNormal = GetIdleByFormID(0x8C5, pluginName);
 		PowerH2H = GetIdleByFormID(0x839, pluginName);
 		PowerBash = GetIdleByFormID(0x8C0, pluginName);
 		SprintPower = GetIdleByFormID(0x8BE, pluginName);
-		ComboAttack = GetIdleByFormID(0x8F1, pluginName);
+		ComboAttack = GetIdleByFormID(0x8BF, pluginName);
 
 		JumpPower = GetIdleByFormID(0x944, pluginName);
 		PowerDirA = GetIdleByFormID(0x945, pluginName);
