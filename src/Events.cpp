@@ -560,6 +560,16 @@ RE::BSEventNotifyControl AttackStateManager::ProcessEvent(const SKSE::ModCallbac
 	std::string_view eventName = a_event->eventName.c_str();
 	int inputID = static_cast<int>(a_event->numArg);
 
+	if (eventName == "TweenPauseReady") {
+		InputManagerAPI::RequestAPIDirect();
+		if (InputManagerAPI::_API) {
+			BFCOMenu::RegisterAllInputs();
+			BFCOMenu::TweenPauseRegister();
+			SKSE::log::info("TweenPauseReady recebido; controles enviados ao Tween Pause.");
+		}
+		return RE::BSEventNotifyControl::kContinue;
+	}
+
 	// --- Sincronização Dinâmica em Tempo Real com o Tween Menu ---
 	if (eventName == "TweenPause_ControlUpdated") {
 		rapidjson::Document doc;
